@@ -7,8 +7,9 @@
 #include <errno.h>
 
 
-#define NEW(T) (T)calloc(1, sizeof(T))
-#define NEW_SIZE(T, size) (T)calloc(size, 1)
+#define CAST(T, v) ((T)(v))
+#define NEW(T) CAST(T*, calloc(1, sizeof(T)))
+#define NEW_SIZE(T, size) CAST(T*, calloc(size, 1))
 #define FREE(p) free(p); (p) = NULL
 
 #define STR2(x) #x
@@ -18,7 +19,5 @@
 void errorf(const char *where, const char *fmt, ...);
 void snapshot(const char* code, int pos, int line);
 char* load_file(const char *filename);
-
-#define CAST(T, v) ((T)(v))
 
 #endif

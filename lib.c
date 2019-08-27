@@ -58,7 +58,7 @@ char* load_file(const char *filename) {
     long fsize = ftell(f);
     rewind(f);
 
-    char *fdata = NEW_SIZE(char*, fsize + 1);
+    char *fdata = NEW_SIZE(char, fsize + 1);
     fread(fdata, sizeof(char), fsize, f);
     fclose(f); f = NULL;
     return fdata;

@@ -59,14 +59,12 @@ enum A_LexState {
 };
 
 A_State* A_newstate(const char *srcfile) {
-    A_State *as = NEW(A_State*);
+    A_State *as = NEW(A_State);
     as->srcfile = srcfile;
     as->src = load_file(srcfile);
 
-    //as->consts = list_new();
+    as->consts = list_new();
     as->instrs = list_new();
-    //printf("--consts--%p %d\n", as->consts, as->consts->count);
-    printf("--instrs--%p %d\n", as->instrs, as->instrs->count);
 
     return as;
 }
@@ -367,19 +365,11 @@ INSTRUCTIONS:
     }
 ==================================================*/
 void A_createbin(const A_State *as, const char *outfile) { 
-    //printf("--consts1--%p %d\n", as->consts, as->consts->count);
-    printf("--instrs1--%p %d\n", as->instrs, as->instrs->count);
-
     FILE *f = fopen(outfile, "wb");
-    //printf("--consts2--%p %d\n", as->consts, as->consts->count);
-    printf("--instrs2--%p \n", as->instrs);
-
     if (f == NULL) {
         perror("");
         error("Open %s failed: %s", outfile, strerror(errno));
     }
-    printf("--consts1--%p %d\n", as->consts, as->consts->count);
-    printf("--instrs1--%p %d\n", as->instrs, as->instrs->count);
 
     int num = 0;
 
@@ -407,11 +397,6 @@ void A_createbin(const A_State *as, const char *outfile) {
     }
 
     /* INSTRUCTIONS */
-    printf("--consts--%p %d\n", as->consts, as->consts->count);
-    printf("--instrs--%p\n", as->instrs);
-
-
-    printf("=-==%d\n", as->instrs->count);
     fwrite(&as->instrs->count, 4, 1, f);
     for (lnode *n = as->instrs->head; n != NULL; n = n->next) {
         A_Instr *instr = CAST(A_Instr*, n->data);
