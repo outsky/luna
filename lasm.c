@@ -4,6 +4,48 @@
 
 #define A_FATAL(...) snapshot(as->src, as->curidx, as->curline); error(__VA_ARGS__)
 
+static A_OpMode _opmodes[] = {
+/*     A        B       C     mode		   opcode	*/
+    {OpArgR, OpArgR, OpArgN, iABC},     /* OP_MOVE */
+    {OpArgR, OpArgK, OpArgN, iABx},		/* OP_LOADK */
+    {OpArgR, OpArgU, OpArgU, iABC}, 	/* OP_LOADBOOL */
+    {OpArgR, OpArgR, OpArgN, iABC}, 	/* OP_LOADNIL */
+    {OpArgR, OpArgU, OpArgN, iABC}, 	/* OP_GETUPVAL */
+    {OpArgR, OpArgK, OpArgN, iABx}, 	/* OP_GETGLOBAL */
+    {OpArgR, OpArgR, OpArgK, iABC}, 	/* OP_GETTABLE */
+    {OpArgR, OpArgK, OpArgN, iABx}, 	/* OP_SETGLOBAL */
+    {OpArgR, OpArgU, OpArgN, iABC}, 	/* OP_SETUPVAL */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_SETTABLE */
+    {OpArgR, OpArgU, OpArgU, iABC}, 	/* OP_NEWTABLE */
+    {OpArgR, OpArgR, OpArgK, iABC}, 	/* OP_SELF */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_ADD */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_SUB */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_MUL */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_DIV */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_MOD */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_POW */
+    {OpArgR, OpArgR, OpArgN, iABC}, 	/* OP_UNM */
+    {OpArgR, OpArgR, OpArgN, iABC}, 	/* OP_NOT */
+    {OpArgR, OpArgR, OpArgN, iABC}, 	/* OP_LEN */
+    {OpArgR, OpArgR, OpArgR, iABC}, 	/* OP_CONCAT */
+    {OpArgN, OpArgR, OpArgN, iAsBx},	/* OP_JMP */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_EQ */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_LT */
+    {OpArgR, OpArgK, OpArgK, iABC}, 	/* OP_LE */
+    {OpArgR, OpArgR, OpArgU, iABC}, 	/* OP_TEST */
+    {OpArgR, OpArgR, OpArgU, iABC}, 	/* OP_TESTSET */
+    {OpArgR, OpArgU, OpArgU, iABC}, 	/* OP_CALL */
+    {OpArgR, OpArgU, OpArgU, iABC}, 	/* OP_TAILCALL */
+    {OpArgR, OpArgU, OpArgN, iABC}, 	/* OP_RETURN */
+    {OpArgR, OpArgR, OpArgN, iAsBx},	/* OP_FORLOOP */
+    {OpArgR, OpArgR, OpArgN, iAsBx},	/* OP_FORPREP */
+    {OpArgR, OpArgN, OpArgU, iABC}, 	/* OP_TFORLOOP */
+    {OpArgR, OpArgU, OpArgU, iABC}, 	/* OP_SETLIST */
+    {OpArgR, OpArgN, OpArgN, iABC}, 	/* OP_CLOSE */
+    {OpArgR, OpArgU, OpArgN, iABx}, 	/* OP_CLOSURE */
+    {OpArgR, OpArgU, OpArgN, iABC}		/* OP_VARARG */
+};
+
 static const char *const _opnames[] = {
   "MOVE",
   "LOADK",
@@ -75,7 +117,7 @@ void A_freestate(A_State *as) {
 }
 
 static void _freetok(A_Token *t) {
-    if (t->t == A_TT_STRING || t->t == A_TT_INSTR) {
+    if (t->t == A_TT_STRING) {
         free(t->u.s); t->u.s = NULL;
     }
     t->t = A_TT_INVALID;
@@ -228,12 +270,14 @@ A_TokenType A_nexttok(A_State *as) {
                     char *tmp = strndup(as->src + begin, as->curidx - begin);
                     if (strcmp(tmp, "K") == 0) {free(tmp); as->curtok.t = A_TT_CONST; return as->curtok.t;}
 
-                    if (_getopcode(tmp) >= 0) {
+                    int oc = _getopcode(tmp);
+                    FREE(tmp);
+                    if (oc >= 0) {
                         as->curtok.t = A_TT_INSTR;
-                        as->curtok.u.s = tmp;
+                        as->curtok.u.n = oc;
                         return as->curtok.t;
                     }
-                    A_FATAL("unexpected ident `%s'", tmp);
+                    A_FATAL("unexpected ident");
                 }
             } break;
 
@@ -273,7 +317,7 @@ void A_ptok(const A_Token *tok) {
             printf("<K> ");
         } break;
         case A_TT_INSTR: {
-            printf("<I:%s> ", tok->u.s);
+            printf("<I:%s> ", _opnames[tok->u.n]);
         } break;
         case A_TT_EOT: {
             printf("<EOT> ");
@@ -284,61 +328,113 @@ void A_ptok(const A_Token *tok) {
     }
 }
 
-void A_parse(A_State *as) {
+static void _resetstate(A_State *as) {
+    as->curline = 1;
+    as->curidx = 0;
+    _freetok(&as->curtok);
 }
 
-static A_OpMode _opmodes[] = {
-/*      B       C     mode		   opcode	*/
-    {OpArgR, OpArgN, iABC},     /* OP_MOVE */
-    {OpArgK, OpArgN, iABx},		/* OP_LOADK */
-    {OpArgU, OpArgU, iABC}, 	/* OP_LOADBOOL */
-    {OpArgR, OpArgN, iABC}, 	/* OP_LOADNIL */
-    {OpArgU, OpArgN, iABC}, 	/* OP_GETUPVAL */
-    {OpArgK, OpArgN, iABx}, 	/* OP_GETGLOBAL */
-    {OpArgR, OpArgK, iABC}, 	/* OP_GETTABLE */
-    {OpArgK, OpArgN, iABx}, 	/* OP_SETGLOBAL */
-    {OpArgU, OpArgN, iABC}, 	/* OP_SETUPVAL */
-    {OpArgK, OpArgK, iABC}, 	/* OP_SETTABLE */
-    {OpArgU, OpArgU, iABC}, 	/* OP_NEWTABLE */
-    {OpArgR, OpArgK, iABC}, 	/* OP_SELF */
-    {OpArgK, OpArgK, iABC}, 	/* OP_ADD */
-    {OpArgK, OpArgK, iABC}, 	/* OP_SUB */
-    {OpArgK, OpArgK, iABC}, 	/* OP_MUL */
-    {OpArgK, OpArgK, iABC}, 	/* OP_DIV */
-    {OpArgK, OpArgK, iABC}, 	/* OP_MOD */
-    {OpArgK, OpArgK, iABC}, 	/* OP_POW */
-    {OpArgR, OpArgN, iABC}, 	/* OP_UNM */
-    {OpArgR, OpArgN, iABC}, 	/* OP_NOT */
-    {OpArgR, OpArgN, iABC}, 	/* OP_LEN */
-    {OpArgR, OpArgR, iABC}, 	/* OP_CONCAT */
-    {OpArgR, OpArgN, iAsBx},	/* OP_JMP */
-    {OpArgK, OpArgK, iABC}, 	/* OP_EQ */
-    {OpArgK, OpArgK, iABC}, 	/* OP_LT */
-    {OpArgK, OpArgK, iABC}, 	/* OP_LE */
-    {OpArgR, OpArgU, iABC}, 	/* OP_TEST */
-    {OpArgR, OpArgU, iABC}, 	/* OP_TESTSET */
-    {OpArgU, OpArgU, iABC}, 	/* OP_CALL */
-    {OpArgU, OpArgU, iABC}, 	/* OP_TAILCALL */
-    {OpArgU, OpArgN, iABC}, 	/* OP_RETURN */
-    {OpArgR, OpArgN, iAsBx},	/* OP_FORLOOP */
-    {OpArgR, OpArgN, iAsBx},	/* OP_FORPREP */
-    {OpArgN, OpArgU, iABC}, 	/* OP_TFORLOOP */
-    {OpArgU, OpArgU, iABC}, 	/* OP_SETLIST */
-    {OpArgN, OpArgN, iABC}, 	/* OP_CLOSE */
-    {OpArgU, OpArgN, iABx}, 	/* OP_CLOSURE */
-    {OpArgU, OpArgN, iABC}		/* OP_VARARG */
+static const char *_toknames[] = {
+    "INVALID",
+    "INT",
+    "FLOAT",
+    "STRING",
+    "COMMA",     /* , */
+    "NEWLINE",
+    "CONST",
+    "INSTR",     /* instruction */
+    "EOT",
 };
+
+#define expect(tt) do {\
+    if (A_nexttok(as) != tt) {\
+        A_FATAL("`%s' expected, got `%s'", _toknames[tt], _toknames[as->curtok.t]);\
+    }\
+} while (0)
+
+static void _parse_const(A_State *as) {
+    A_TokenType kt = A_nexttok(as);
+    A_Const *k = NEW(A_Const);
+    if (kt == A_TT_INT) {
+        k->t = A_CT_INT;
+        k->u.n = as->curtok.u.n;
+    } else if (kt == A_TT_FLOAT) {
+        k->t = A_CT_FLOAT;
+        k->u.f = as->curtok.u.f;
+    } else if (kt == A_TT_STRING) {
+        k->t = A_CT_STRING;
+        k->u.s = strdup(as->curtok.u.s);
+    } else {
+        FREE(k);
+        A_FATAL("const can only be int, float and string");
+    }
+    list_pushback(as->consts, k);
+    expect(A_TT_NEWLINE);
+}
+
+static void _parse_instr(A_State *as) {
+    A_OpCode oc = as->curtok.u.n;
+
+    const A_OpMode *om = &_opmodes[oc];
+    int a, b, c;
+    a = b = c = 0;
+    if (om->a != OpArgN) {
+        expect(A_TT_INT);
+        a = as->curtok.u.n;
+        if (om->b != OpArgN || om->c != OpArgN) {
+            expect(A_TT_COMMA);
+        }
+    }
+
+    if (om->b != OpArgN) {
+        expect(A_TT_INT);
+        b = as->curtok.u.n;
+        if (om->c != OpArgN) {
+            expect(A_TT_COMMA);
+        }
+    }
+
+    if (om->c != OpArgN) {
+        expect(A_TT_INT);
+        c = as->curtok.u.n;
+    }
+
+    expect(A_TT_NEWLINE);
+
+    A_Instr *ins = NEW(A_Instr);
+    ins->t = oc;
+    ins->a = a;
+    ins->b = b;
+    ins->c = c;
+    list_pushback(as->instrs, ins);
+}
+
+void A_parse(A_State *as) {
+    _resetstate(as);
+
+    for (;;) {
+        A_TokenType tt = A_nexttok(as);
+        switch (tt) {
+            case A_TT_CONST: {_parse_const(as);} break;
+            case A_TT_INSTR: {_parse_instr(as);} break;
+            case A_TT_NEWLINE: {} break;
+            case A_TT_EOT: {return;}
+            default: {A_FATAL("unexpected token");} break;
+        }
+    }
+}
 
 static int _instr_num(const A_Instr *instr) {
     const A_OpMode *om = &_opmodes[instr->t];
     switch (om->m) {
         case iABC: {
-            return (instr->t << A_POS_OP) + (instr->A << A_POS_A) + (instr->B << A_POS_B) + (instr->C << A_POS_C);
+            return (instr->t << A_POS_OP) + (instr->a << A_POS_A) + 
+                (instr->b << A_POS_B) + (instr->c << A_POS_C);
         }
 
         case iABx: 
         case iAsBx: {
-            return (instr->t << A_POS_OP) + (instr->A << A_POS_A) + (instr->B << A_POS_BX);
+            return (instr->t << A_POS_OP) + (instr->a << A_POS_A) + (instr->b << A_POS_BX);
         }
     }
     return 0;

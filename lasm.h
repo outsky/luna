@@ -45,6 +45,7 @@ typedef enum {
 } OpArgMask;
 
 typedef struct {
+    OpArgMask a;
     OpArgMask b;
     OpArgMask c;
     OpMode m;
@@ -148,9 +149,9 @@ typedef struct {
 
 typedef struct {
     A_OpCode t;
-    int A;
-    int B;
-    int C;
+    int a;
+    int b;
+    int c;
 } A_Instr;
 
 typedef struct {
