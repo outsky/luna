@@ -77,7 +77,7 @@ static void _freetok(A_Token *t) {
     t->t = A_TT_INVALID;
 }
 
-static A_OpCode _getopcode(const char *opname) {
+static int _getopcode(const char *opname) {
     for (int i = 0; _opnames[i] != NULL; ++i) {
         if (strcmp(opname, _opnames[i]) == 0) {
             return i;
@@ -242,13 +242,13 @@ A_TokenType A_nexttok(A_State *as) {
 void A_ptok(const A_Token *tok) {
     switch (tok->t) {
         case A_TT_INT: {
-            printf("<%d> ", tok->u.n);
+            printf("<D:%d> ", tok->u.n);
         } break;
         case A_TT_FLOAT: {
-            printf("<%lf> ", tok->u.f);
+            printf("<F:%lf> ", tok->u.f);
         } break;
         case A_TT_STRING: {
-            printf("<%s> ", tok->u.s);
+            printf("<S:%s> ", tok->u.s);
         } break;
         case A_TT_COMMA: {
             printf("<,> ");
@@ -260,7 +260,7 @@ void A_ptok(const A_Token *tok) {
             printf("<K> ");
         } break;
         case A_TT_INSTR: {
-            printf("<%s> ", tok->u.s);
+            printf("<I:%s> ", tok->u.s);
         } break;
         case A_TT_EOT: {
             printf("<EOT> ");
