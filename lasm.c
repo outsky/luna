@@ -62,6 +62,12 @@ A_State* A_newstate(const char *srcfile) {
     A_State *as = NEW(A_State*);
     as->srcfile = srcfile;
     as->src = load_file(srcfile);
+
+    //as->consts = list_new();
+    as->instrs = list_new();
+    //printf("--consts--%p %d\n", as->consts, as->consts->count);
+    printf("--instrs--%p %d\n", as->instrs, as->instrs->count);
+
     return as;
 }
 
@@ -279,3 +285,140 @@ void A_ptok(const A_Token *tok) {
         } break;
     }
 }
+
+void A_parse(A_State *as) {
+}
+
+static A_OpMode _opmodes[] = {
+/*      B       C     mode		   opcode	*/
+    {OpArgR, OpArgN, iABC},     /* OP_MOVE */
+    {OpArgK, OpArgN, iABx},		/* OP_LOADK */
+    {OpArgU, OpArgU, iABC}, 	/* OP_LOADBOOL */
+    {OpArgR, OpArgN, iABC}, 	/* OP_LOADNIL */
+    {OpArgU, OpArgN, iABC}, 	/* OP_GETUPVAL */
+    {OpArgK, OpArgN, iABx}, 	/* OP_GETGLOBAL */
+    {OpArgR, OpArgK, iABC}, 	/* OP_GETTABLE */
+    {OpArgK, OpArgN, iABx}, 	/* OP_SETGLOBAL */
+    {OpArgU, OpArgN, iABC}, 	/* OP_SETUPVAL */
+    {OpArgK, OpArgK, iABC}, 	/* OP_SETTABLE */
+    {OpArgU, OpArgU, iABC}, 	/* OP_NEWTABLE */
+    {OpArgR, OpArgK, iABC}, 	/* OP_SELF */
+    {OpArgK, OpArgK, iABC}, 	/* OP_ADD */
+    {OpArgK, OpArgK, iABC}, 	/* OP_SUB */
+    {OpArgK, OpArgK, iABC}, 	/* OP_MUL */
+    {OpArgK, OpArgK, iABC}, 	/* OP_DIV */
+    {OpArgK, OpArgK, iABC}, 	/* OP_MOD */
+    {OpArgK, OpArgK, iABC}, 	/* OP_POW */
+    {OpArgR, OpArgN, iABC}, 	/* OP_UNM */
+    {OpArgR, OpArgN, iABC}, 	/* OP_NOT */
+    {OpArgR, OpArgN, iABC}, 	/* OP_LEN */
+    {OpArgR, OpArgR, iABC}, 	/* OP_CONCAT */
+    {OpArgR, OpArgN, iAsBx},	/* OP_JMP */
+    {OpArgK, OpArgK, iABC}, 	/* OP_EQ */
+    {OpArgK, OpArgK, iABC}, 	/* OP_LT */
+    {OpArgK, OpArgK, iABC}, 	/* OP_LE */
+    {OpArgR, OpArgU, iABC}, 	/* OP_TEST */
+    {OpArgR, OpArgU, iABC}, 	/* OP_TESTSET */
+    {OpArgU, OpArgU, iABC}, 	/* OP_CALL */
+    {OpArgU, OpArgU, iABC}, 	/* OP_TAILCALL */
+    {OpArgU, OpArgN, iABC}, 	/* OP_RETURN */
+    {OpArgR, OpArgN, iAsBx},	/* OP_FORLOOP */
+    {OpArgR, OpArgN, iAsBx},	/* OP_FORPREP */
+    {OpArgN, OpArgU, iABC}, 	/* OP_TFORLOOP */
+    {OpArgU, OpArgU, iABC}, 	/* OP_SETLIST */
+    {OpArgN, OpArgN, iABC}, 	/* OP_CLOSE */
+    {OpArgU, OpArgN, iABx}, 	/* OP_CLOSURE */
+    {OpArgU, OpArgN, iABC}		/* OP_VARARG */
+};
+
+static int _instr_num(const A_Instr *instr) {
+    const A_OpMode *om = &_opmodes[instr->t];
+    switch (om->m) {
+        case iABC: {
+            return (instr->t << A_POS_OP) + (instr->A << A_POS_A) + (instr->B << A_POS_B) + (instr->C << A_POS_C);
+        }
+
+        case iABx: 
+        case iAsBx: {
+            return (instr->t << A_POS_OP) + (instr->A << A_POS_A) + (instr->B << A_POS_BX);
+        }
+    }
+    return 0;
+}
+
+/*==================================================
+HEADER:
+    "LUNA" (4 bytes)
+    VER_MAJOR (2 bytes)
+    VER_MINOR (2 bytes)
+
+CONSTS:
+    count (4 bytes)
+    {
+        type (1 byte)
+        [size (4 bytes) only for string]
+        data (4 bytes for number)
+    }
+
+INSTRUCTIONS:
+    count (4 bytes)
+    {
+        data (4 bytes)
+    }
+==================================================*/
+void A_createbin(const A_State *as, const char *outfile) { 
+    //printf("--consts1--%p %d\n", as->consts, as->consts->count);
+    printf("--instrs1--%p %d\n", as->instrs, as->instrs->count);
+
+    FILE *f = fopen(outfile, "wb");
+    //printf("--consts2--%p %d\n", as->consts, as->consts->count);
+    printf("--instrs2--%p \n", as->instrs);
+
+    if (f == NULL) {
+        perror("");
+        error("Open %s failed: %s", outfile, strerror(errno));
+    }
+    printf("--consts1--%p %d\n", as->consts, as->consts->count);
+    printf("--instrs1--%p %d\n", as->instrs, as->instrs->count);
+
+    int num = 0;
+
+    /* HEADER */
+    fwrite("LUNA", 1, 4, f);
+    num = A_VER_MAJOR;
+    fwrite(&num, 2, 1, f);
+    num = A_VER_MINOR;
+    fwrite(&num, 2, 1, f);
+
+    /* CONSTS */
+    fwrite(&as->consts->count, 4, 1, f);
+    for (lnode *n = as->consts->head; n != NULL; n = n->next) {
+        A_Const *k = CAST(A_Const*, n->data);
+        fwrite(&k->t, 1, 1, f);
+        if (k->t == A_CT_INT) {
+            fwrite(&k->u.n, 4, 1, f);
+        } else if (k->t == A_CT_FLOAT) {
+            fwrite(&k->u.f, 4, 1, f);
+        } else {
+            int len = strlen(k->u.s);
+            fwrite(&len, 4, 1, f);
+            fwrite(k->u.s, 1, len, f);
+        }
+    }
+
+    /* INSTRUCTIONS */
+    printf("--consts--%p %d\n", as->consts, as->consts->count);
+    printf("--instrs--%p\n", as->instrs);
+
+
+    printf("=-==%d\n", as->instrs->count);
+    fwrite(&as->instrs->count, 4, 1, f);
+    for (lnode *n = as->instrs->head; n != NULL; n = n->next) {
+        A_Instr *instr = CAST(A_Instr*, n->data);
+        int in = _instr_num(instr);
+        fwrite(&in, 4, 1, f);
+    }
+
+    fclose(f); f = NULL;
+}
+

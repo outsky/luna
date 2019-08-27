@@ -1,6 +1,55 @@
 #ifndef lasm_h
 #define lasm_h
 
+#include "list.h"
+
+#define A_VER_MAJOR 5
+#define A_VER_MINOR 1
+
+/*===========================================================================
+  We assume that instructions are unsigned numbers.
+  All instructions have an opcode in the first 6 bits.
+  Instructions can have the following fields:
+	`A' : 8 bits
+	`B' : 9 bits
+	`C' : 9 bits
+	`Bx' : 18 bits (`B' and `C' together)
+	`sBx' : signed Bx
+
+  A signed argument is represented in excess K; that is, the number
+  value is the unsigned value minus K. K is exactly the maximum value
+  for that argument (so that -max is represented by 0, and +max is
+  represented by 2*max), which is half the maximum for the corresponding
+  unsigned argument.
+===========================================================================*/
+
+typedef enum {iABC, iABx, iAsBx} OpMode;   /* basic instruction format */
+
+#define A_SIZE_OP 6
+#define A_SIZE_A 8
+#define A_SIZE_B 9
+#define A_SIZE_C 9
+#define A_SIZE_BX (A_SIZE_B + A_SIZE_C)
+
+#define A_POS_OP 0
+#define A_POS_A (A_POS_OP + A_SIZE_OP)
+#define A_POS_B (A_POS_A + A_SIZE_A)
+#define A_POS_C (A_POS_B + A_SIZE_B)
+#define A_POS_BX A_POS_B
+
+typedef enum {
+  OpArgN,  /* argument is not used */
+  OpArgU,  /* argument is used */
+  OpArgR,  /* argument is a register or a jump offset */
+  OpArgK   /* argument is a constant or register/constant */
+} OpArgMask;
+
+typedef struct {
+    OpArgMask b;
+    OpArgMask c;
+    OpMode m;
+} A_OpMode;
+
 typedef enum {
 /*----------------------------------------------------------------------
 name		args	description
@@ -66,10 +115,10 @@ typedef enum {
     A_TT_INT,
     A_TT_FLOAT,
     A_TT_STRING,
-    A_TT_COMMA,     // ,
+    A_TT_COMMA,     /* , */
     A_TT_NEWLINE,
     A_TT_CONST,
-    A_TT_INSTR,     // instruction
+    A_TT_INSTR,     /* instruction */
     A_TT_EOT,
 } A_TokenType;
 
@@ -82,11 +131,36 @@ typedef struct {
     } u;
 } A_Token;
 
+typedef enum {
+    A_CT_INT,
+    A_CT_FLOAT,
+    A_CT_STRING,
+} A_ConstType;
+
+typedef struct {
+    A_ConstType t;
+    union {
+        int n;
+        double f;
+        char *s;
+    } u;
+} A_Const;
+
+typedef struct {
+    A_OpCode t;
+    int A;
+    int B;
+    int C;
+} A_Instr;
+
 typedef struct {
     const char *srcfile;
     char *src;
     int curline;
     int curidx;
+
+    list *consts;
+    list *instrs;
 
     A_Token curtok;
 } A_State;
@@ -95,6 +169,9 @@ A_State* A_newstate(const char *srcfile);
 void A_freestate(A_State *as);
 
 A_TokenType A_nexttok(A_State *as);
+
+void A_parse(A_State *as);
+void A_createbin(const A_State *as, const char *outfile);
 
 void A_ptok(const A_Token *tok);
 

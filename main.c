@@ -1,14 +1,15 @@
 #include "lib.h"
 #include "lasm.h"
 
-void usage(const char *pname) {
+static void usage(const char *pname) {
     printf("%s [-op] filename\n", pname);
     printf("op:\n"
             "\tla: lexer .lasm\n"
+            "\tas: assemble .lasm to .lbin\n"
     );
 }
 
-void la(const char *filename) {
+static void lexer_asm(const char *filename) {
     A_State *as = A_newstate(filename);
 
     for (;;) {
@@ -22,6 +23,13 @@ void la(const char *filename) {
     A_freestate(as); as = NULL;
 }
 
+static void assemble_asm(const char *filename) {
+    A_State *as = A_newstate(filename);
+    A_parse(as);
+    A_createbin(as, "a.lbin");
+    A_freestate(as); as = NULL;
+}
+
 int main(int argc, const char **argv) {
     const char* pname = argv[0];
     if (argc != 3) {
@@ -32,7 +40,9 @@ int main(int argc, const char **argv) {
     const char *opt = argv[1];
     const char *filename = argv[2];
     if (strcmp(opt, "-la") == 0) {
-        la(filename);
+        lexer_asm(filename);
+    } else if (strcmp(opt, "-as") == 0) {
+        assemble_asm(filename);
     } else {
         usage(pname);
         exit(-1);

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 
 #define NEW(T) (T)calloc(1, sizeof(T))
@@ -17,5 +18,7 @@
 void errorf(const char *where, const char *fmt, ...);
 void snapshot(const char* code, int pos, int line);
 char* load_file(const char *filename);
+
+#define CAST(T, v) ((T)(v))
 
 #endif
