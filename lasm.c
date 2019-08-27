@@ -87,7 +87,8 @@ static int _getopcode(const char *opname) {
 }
 
 A_TokenType A_nexttok(A_State *as) {
-    if (as->curidx >= strlen(as->src)) {
+    int maxidx = strlen(as->src);
+    if (as->curidx >= maxidx) {
         return A_TT_EOT;
     }
     int ls = A_LS_INIT;
@@ -97,6 +98,10 @@ A_TokenType A_nexttok(A_State *as) {
         char c = as->src[as->curidx++];
         switch (ls) {
             case A_LS_INIT: {
+                if (c == '\0') {
+                    return A_TT_EOT;
+                }
+
                 if (c == '\r' || isblank(c))  {
                     break;
                 }
@@ -191,6 +196,10 @@ A_TokenType A_nexttok(A_State *as) {
             } break;
 
             case A_LS_STR_HALF: {
+                if (c == '\0') {
+                    A_FATAL("unfinished string");
+                }
+
                 if (c == '\\') {
                     ls = A_LS_STR_ESC;
                     break;
