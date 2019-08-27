@@ -1,7 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "lib.h"
+#include "lasm.h"
 
 void usage(const char *pname) {
     printf("%s [-op] filename\n", pname);
@@ -10,24 +8,18 @@ void usage(const char *pname) {
     );
 }
 
-static const char* _load_file(const char *filename) {
-    FILE *f = fopen(filename, "rb");
-    if (f == NULL) {
-        perror("Open file failed");
-        exit(-1);
-    }
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    rewind(f);
-
-    char *source = (char *)malloc(fsize + 1);
-    memset(source, 0, fsize + 1);
-    fread(source, sizeof(char), fsize, f);
-    fclose(f); f = NULL;
-    return source;
-}
-
 void la(const char *filename) {
+    A_State *as = A_newstate(filename);
+
+    for (;;) {
+        if (A_nexttok(as) == A_TT_EOT) {
+            printf("<EOT>\n");
+            break;
+        }
+        A_ptok(&as->curtok);
+    }
+
+    A_freestate(as); as = NULL;
 }
 
 int main(int argc, const char **argv) {

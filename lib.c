@@ -47,3 +47,20 @@ void snapshot(const char* code, int pos, int line) {
     }
     printf("\n'''\n");
 }
+
+char* load_file(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (f == NULL) {
+        perror("Open file failed");
+        exit(-1);
+    }
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    rewind(f);
+
+    char *fdata = NEW_SIZE(char*, fsize + 1);
+    fread(fdata, sizeof(char), fsize, f);
+    fclose(f); f = NULL;
+    return fdata;
+}
+
