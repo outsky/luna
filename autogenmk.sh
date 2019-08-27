@@ -16,7 +16,7 @@ echo "# Autogened at `date +\"%Y/%m/%d %H:%M:%S\"`
 
 BIN = luna
 
-CFLAGS = -g Wall -std=c99 -D_GNU_SOURCE
+CFLAGS = -g -Wall -std=c99 -D_GNU_SOURCE
 
 LIBS = #empty
 

@@ -1,8 +1,8 @@
-# Autogened at 2019/08/27 13:28:10
+# Autogened at 2019/08/27 13:42:39
 
 BIN = luna
 
-CFLAGS = -g Wall -std=c99 -D_GNU_SOURCE
+CFLAGS = -g -Wall -std=c99 -D_GNU_SOURCE
 
 LIBS = #empty
 
@@ -15,7 +15,7 @@ clean:
 	rm -f $(BIN) $(ALL_O)
 
 # autogen with cc -MM
-lasm.o: lasm.c
+lasm.o: lasm.c lasm.h
 lib.o: lib.c lib.h
 list.o: list.c list.h
 main.o: main.c lib.h
