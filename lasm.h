@@ -51,6 +51,8 @@ typedef struct {
     OpMode m;
 } A_OpMode;
 
+extern A_OpMode A_OpModes[];
+
 typedef enum {
 /*----------------------------------------------------------------------
 name		args	description

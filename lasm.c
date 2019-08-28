@@ -4,7 +4,7 @@
 
 #define A_FATAL(...) snapshot(as->src, as->curidx, as->curline); error(__VA_ARGS__)
 
-static A_OpMode _opmodes[] = {
+A_OpMode A_OpModes[] = {
 /*     A        B       C     mode		   opcode	*/
     {OpArgR, OpArgR, OpArgN, iABC},     /* OP_MOVE */
     {OpArgR, OpArgK, OpArgN, iABx},		/* OP_LOADK */
@@ -375,7 +375,7 @@ static void _parse_const(A_State *as) {
 static void _parse_instr(A_State *as) {
     A_OpCode oc = as->curtok.u.n;
 
-    const A_OpMode *om = &_opmodes[oc];
+    const A_OpMode *om = &A_OpModes[oc];
     int a, b, c;
     a = b = c = 0;
     if (om->a != OpArgN) {
@@ -425,7 +425,7 @@ void A_parse(A_State *as) {
 }
 
 static int _instr_num(const A_Instr *instr) {
-    const A_OpMode *om = &_opmodes[instr->t];
+    const A_OpMode *om = &A_OpModes[instr->t];
     switch (om->m) {
         case iABC: {
             return (instr->t << A_POS_OP) + (instr->a << A_POS_A) + 

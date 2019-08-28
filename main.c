@@ -1,11 +1,13 @@
 #include "lib.h"
 #include "lasm.h"
+#include "lvm.h"
 
 static void usage(const char *pname) {
     printf("%s [-op] filename\n", pname);
     printf("op:\n"
             "\tla: lexer .lasm\n"
             "\tas: assemble .lasm to .lbin\n"
+            "\tvm: run .lbin\n"
     );
 }
 
@@ -30,6 +32,13 @@ static void assemble_asm(const char *filename) {
     A_freestate(as); as = NULL;
 }
 
+static void vm_bin(const char *filename) {
+    V_State *vs = V_newstate(filename);
+    V_load(vs, filename);
+    V_run(vs);
+    V_freestate(vs); vs = NULL;
+}
+
 int main(int argc, const char **argv) {
     const char* pname = argv[0];
     if (argc != 3) {
@@ -43,6 +52,8 @@ int main(int argc, const char **argv) {
         lexer_asm(filename);
     } else if (strcmp(opt, "-as") == 0) {
         assemble_asm(filename);
+    } else if (strcmp(opt, "-vm") == 0) {
+        vm_bin(filename);
     } else {
         usage(pname);
         exit(-1);

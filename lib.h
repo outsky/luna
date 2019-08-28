@@ -8,7 +8,8 @@
 
 
 #define CAST(T, v) ((T)(v))
-#define NEW(T) CAST(T*, calloc(1, sizeof(T)))
+#define NEW_ARRAY(T, n) CAST(T*, calloc(n, sizeof(T)))
+#define NEW(T) NEW_ARRAY(T, 1)
 #define NEW_SIZE(T, size) CAST(T*, calloc(size, 1))
 #define FREE(p) free(p); (p) = NULL
 
