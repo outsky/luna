@@ -12,7 +12,7 @@ void V_freestate(V_State *vs) {
 
 void _show_status(const V_State *vs) {
     printf("version: %d.%d\n", vs->major, vs->minor);
-    printf("regcount: %d\n", vs->regcount);
+    printf("regcount: %d\n", vs->reg.count);
     printf("counts: %d\n", vs->k.count);
     for (int i = 0; i < vs->k.count; ++i) {
         printf("%d.\t", i);
@@ -47,7 +47,8 @@ void V_load(V_State *vs, const char *binfile) {
     }
     fread(&vs->major, 2, 1, f);
     fread(&vs->minor, 2, 1, f);
-    fread(&vs->regcount, 2, 1, f);
+    fread(&vs->reg.count, 2, 1, f);
+    vs->reg.regs = NEW_ARRAY(V_Reg, vs->reg.count);
 
     /* CONSTS */
     fread(&vs->k.count, 4, 1, f);
@@ -94,5 +95,28 @@ void V_load(V_State *vs, const char *binfile) {
     _show_status(vs);
 }
 
-void V_run(V_State *vs) {
+static void _resetstate(V_State *vs) {
+    vs->ins.ip = 0;
 }
+
+static void _exec_ins(V_State *vs, const A_Instr *ins) {
+    printf("exec %d: %d %d, %d, %d\n", vs->ins.ip, ins->t, ins->a, ins->b, ins->c);
+}
+
+void V_run(V_State *vs) {
+    _resetstate(vs);
+
+    for (;;) {
+        int oldip = vs->ins.ip;
+        if (oldip >= vs->ins.count) {
+            break;
+        }
+        const A_Instr *ins = &vs->ins.instrs[vs->ins.ip];
+        _exec_ins(vs, ins);
+
+        if (oldip == vs->ins.ip) {
+            ++vs->ins.ip;
+        }
+    }
+}
+
