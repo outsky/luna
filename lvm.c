@@ -131,6 +131,23 @@ static void _copy_value(Value *dest, const Value *src) {
     }
 }
 
+static Value* RK(V_State *vs, int x) {
+    if (ISK(x)) {
+        return &vs->k.consts[INDEXK(x)];
+    }
+    return &vs->reg.regs[x];
+}
+
+static double _get_value_float(const Value *v) {
+    if (v->t == VT_INT) {
+        return CAST(double, v->u.n);
+    } else if (v->t == VT_FLOAT) {
+        return v->u.f;
+    }
+    error("can't cast to float: %d", v->t);
+    return 0.0;
+}
+
 static void _exec_ins(V_State *vs, const A_Instr *ins) {
     printf("-> %d: <%s %d, %d, %d>\n", vs->ins.ip, A_opnames[ins->t], ins->a, ins->b, ins->c);
     switch (ins->t) {
@@ -142,8 +159,27 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             _copy_value(&vs->reg.regs[ins->a], &vs->k.consts[ins->b]);
         } break;
 
-        case OP_LOADBOOL: {} break;
-        case OP_LOADNIL: {} break;
+        case OP_LOADBOOL: {
+            /*	A B C	R(A) := (Bool)B; if (C) pc++			*/
+            /* TODO: what does this `if (C) pc++' mean?
+            The pc will increase automatically however. I wonder */
+            Value src;
+            src.t = VT_BOOL;
+            src.u.n = ins->b != 0;
+            _copy_value(&vs->reg.regs[ins->a], &src);
+            if (ins->c) {
+                ++vs->ins.ip;
+            }
+        } break;
+
+        case OP_LOADNIL: {
+            Value src;
+            src.t = VT_NIL;
+            for (int i = ins->a; i <= ins->b; ++i) {
+                _copy_value(&vs->reg.regs[i], &src);
+            }
+        } break;
+
         case OP_GETUPVAL: {} break;
         case OP_GETGLOBAL: {} break;
         case OP_GETTABLE: {} break;
@@ -152,27 +188,136 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_SETTABLE: {} break;
         case OP_NEWTABLE: {} break;
         case OP_SELF: {} break;
-        case OP_ADD: {} break;
-        case OP_SUB: {} break;
-        case OP_MUL: {} break;
-        case OP_DIV: {} break;
-        case OP_MOD: {} break;
-        case OP_POW: {} break;
-        case OP_UNM: {} break;
-        case OP_NOT: {} break;
+
+        case OP_ADD:
+        case OP_SUB:
+        case OP_MUL:
+        case OP_DIV:
+        case OP_MOD:
+        case OP_POW: {
+            const Value *b = RK(vs, ins->b);
+            const Value *c = RK(vs, ins->c);
+            double bf = _get_value_float(b);
+            double cf = _get_value_float(c);
+            double ca = 0.0;
+            Value v;
+            v.t = VT_FLOAT;
+            switch (ins->t) {
+                case OP_ADD: {ca = bf + cf;} break;
+                case OP_SUB: {ca = bf - cf;} break;
+                case OP_MUL: {ca = bf * cf;} break;
+                case OP_DIV: {ca = bf / cf;} break;
+                case OP_MOD: {
+                    if (b->t != VT_INT || c->t != VT_INT) {
+                        error("op mod only support int, got: %d, %d", b->t, c->t);
+                    }
+                    v.t = VT_INT;
+                    ca = (int)bf % (int)cf;
+                } break;
+                case OP_POW: {
+                    if (b->t != VT_INT || c->t != VT_INT) {
+                        error("op mod only support int, got: %d, %d", b->t, c->t);
+                    }
+                    v.t = VT_INT;
+                    ca = (int)bf ^ (int)cf;
+                } break;
+                default: {
+                    error("impossible: %d", ins->t);
+                } break;
+            }
+            if (v.t == VT_INT) {
+                v.u.n = (int)ca;
+            } else {
+                v.u.f = ca;
+            }
+            _copy_value(&vs->reg.regs[ins->a], &v);
+        } break;
+
+        case OP_UNM: {
+            Value v;
+            v.t = VT_INVALID;
+            _copy_value(&v, &vs->reg.regs[ins->b]);
+            if (v.t == VT_INT) {
+                v.u.n = -v.u.n;
+            } else if (v.t == VT_FLOAT) {
+                v.u.f = -v.u.f;
+            } else {
+                error("value type error: %d", v.t);
+            }
+            _copy_value(&vs->reg.regs[ins->a], &v);
+        } break;
+
+        case OP_NOT: {
+            Value v;
+            v.t = VT_BOOL;
+            const Value *b = &vs->reg.regs[ins->b];
+            switch (b->t) {
+                case VT_BOOL: {v.u.n = b->u.n == 0;} break;
+                case VT_NIL: {v.u.n = 1;} break;
+                default: {v.u.n = 0;} break;
+            }
+            _copy_value(&vs->reg.regs[ins->a], &v);
+        } break;
+
         case OP_LEN: {} break;
         case OP_CONCAT: {} break;
-        case OP_JMP: {} break;
-        case OP_EQ: {} break;
-        case OP_LT: {} break;
-        case OP_LE: {} break;
-        case OP_TEST: {} break;
-        case OP_TESTSET: {} break;
+
+        case OP_JMP: {
+            vs->ins.ip += ins->b;
+        } break;
+
+        case OP_EQ:
+        case OP_LT:
+        case OP_LE: {
+            /* TODO: again, confusing */
+            const Value *b = RK(vs, ins->b);
+            const Value *c = RK(vs, ins->c);
+            float bf = _get_value_float(b);
+            float cf = _get_value_float(c);
+            int result = 0;
+            switch (ins->t) {
+                case OP_EQ: {result = (bf == cf) != ins->a;} break;
+                case OP_LT: {result = (bf < cf) != ins->a;} break;
+                case OP_LE: {result = (bf <= cf) != ins->a;} break;
+                default: {error("impossible: %d", ins->t);} break;
+            }
+            if (result) {
+                ++vs->ins.ip;
+            }
+        } break;
+
+        case OP_TEST: {
+            /* if not (R(A) <=> C) then pc++ */
+            /* TODO: what does the `<=>' mean? I just consider it to `=='*/
+            int a = (int)_get_value_float(&vs->reg.regs[ins->a]);
+            if (a != ins->c) {++vs->ins.ip;}
+        } break;
+
+        case OP_TESTSET: {
+            /* TODO: as OP_TEST, confusing `<=>' */
+            int b = (int)_get_value_float(&vs->reg.regs[ins->b]);
+            if (b == ins->c) {
+                _copy_value(&vs->reg.regs[ins->a], &vs->reg.regs[ins->b]);
+            } else {
+                ++vs->ins.ip;
+            }
+        } break;
+
         case OP_CALL: {} break;
         case OP_TAILCALL: {} break;
         case OP_RETURN: {} break;
         case OP_FORLOOP: {} break;
-        case OP_FORPREP: {} break;
+
+        case OP_FORPREP: {
+            float af = _get_value_float(&vs->reg.regs[ins->a]);
+            float a2f = _get_value_float(&vs->reg.regs[ins->a + 2]);
+            Value v;
+            v.t = VT_FLOAT;
+            v.u.f = af - a2f;
+            _copy_value(&vs->reg.regs[ins->a], &v);
+            vs->ins.ip += ins->b;
+        } break;
+
         case OP_TFORLOOP: {} break;
         case OP_SETLIST: {} break;
         case OP_CLOSE: {} break;

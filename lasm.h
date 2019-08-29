@@ -54,6 +54,31 @@ typedef struct {
 extern A_OpMode A_OpModes[];
 extern const char *const A_opnames[];
 
+/*
+** Macros to operate RK indices
+*/
+
+/* this bit 1 means constant (0 means register) */
+#define BITRK		(1 << (A_SIZE_B - 1))
+
+/* test whether value is a constant */
+#define ISK(x)		((x) & BITRK)
+
+/* gets the index of the constant */
+#define INDEXK(r)	((int)(r) & ~BITRK)
+
+#define MAXINDEXRK	(BITRK - 1)
+
+/* code a constant index as a RK value */
+#define RKASK(x)	((x) | BITRK)
+
+
+/*
+** R(x) - register
+** Kst(x) - constant (in constant table)
+** RK(x) == if ISK(x) then Kst(INDEXK(x)) else R(x)
+*/
+
 typedef enum {
 /*----------------------------------------------------------------------
 name		args	description
