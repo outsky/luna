@@ -52,6 +52,7 @@ typedef struct {
 } A_OpMode;
 
 extern A_OpMode A_OpModes[];
+extern const char *const A_opnames[];
 
 typedef enum {
 /*----------------------------------------------------------------------
@@ -136,19 +137,22 @@ typedef struct {
 } A_Token;
 
 typedef enum {
-    A_CT_INT,
-    A_CT_FLOAT,
-    A_CT_STRING,
-} A_ConstType;
+    VT_INVALID,
+    VT_INT,
+    VT_FLOAT,
+    VT_STRING,
+    VT_BOOL,
+    VT_NIL,
+} ValueType;
 
 typedef struct {
-    A_ConstType t;
+    ValueType t;
     union {
         int n;
         double f;
         char *s;
     } u;
-} A_Const;
+} Value;
 
 typedef struct {
     A_OpCode t;

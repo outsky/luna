@@ -46,7 +46,7 @@ A_OpMode A_OpModes[] = {
     {OpArgR, OpArgU, OpArgN, iABC}		/* OP_VARARG */
 };
 
-static const char *const _opnames[] = {
+const char *const A_opnames[] = {
   "MOVE",
   "LOADK",
   "LOADBOOL",
@@ -124,8 +124,8 @@ static void _freetok(A_Token *t) {
 }
 
 static int _getopcode(const char *opname) {
-    for (int i = 0; _opnames[i] != NULL; ++i) {
-        if (strcmp(opname, _opnames[i]) == 0) {
+    for (int i = 0; A_opnames[i] != NULL; ++i) {
+        if (strcmp(opname, A_opnames[i]) == 0) {
             return i;
         }
     }
@@ -321,7 +321,7 @@ void A_ptok(const A_Token *tok) {
             printf("<REGCOUNT> ");
         } break;
         case A_TT_INSTR: {
-            printf("<I:%s> ", _opnames[tok->u.n]);
+            printf("<I:%s> ", A_opnames[tok->u.n]);
         } break;
         case A_TT_EOT: {
             printf("<EOT> ");
@@ -358,15 +358,15 @@ static const char *_toknames[] = {
 
 static void _parse_const(A_State *as) {
     A_TokenType kt = A_nexttok(as);
-    A_Const *k = NEW(A_Const);
+    Value *k = NEW(Value);
     if (kt == A_TT_INT) {
-        k->t = A_CT_INT;
+        k->t = VT_INT;
         k->u.n = as->curtok.u.n;
     } else if (kt == A_TT_FLOAT) {
-        k->t = A_CT_FLOAT;
+        k->t = VT_FLOAT;
         k->u.f = as->curtok.u.f;
     } else if (kt == A_TT_STRING) {
-        k->t = A_CT_STRING;
+        k->t = VT_STRING;
         k->u.s = strdup(as->curtok.u.s);
     } else {
         FREE(k);
@@ -492,16 +492,18 @@ void A_createbin(const A_State *as, const char *outfile) {
     /* CONSTS */
     fwrite(&as->consts->count, 4, 1, f);
     for (lnode *n = as->consts->head; n != NULL; n = n->next) {
-        A_Const *k = CAST(A_Const*, n->data);
+        Value *k = CAST(Value*, n->data);
         fwrite(&k->t, 1, 1, f);
-        if (k->t == A_CT_INT) {
+        if (k->t == VT_INT) {
             fwrite(&k->u.n, 4, 1, f);
-        } else if (k->t == A_CT_FLOAT) {
+        } else if (k->t == VT_FLOAT) {
             fwrite(&k->u.f, 4, 1, f);
-        } else {
+        } else if (k->t == VT_STRING) {
             int len = strlen(k->u.s);
             fwrite(&len, 4, 1, f);
             fwrite(k->u.s, 1, len, f);
+        } else {
+            error("unexpected const type: %d", k->t);
         }
     }
 

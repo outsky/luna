@@ -16,13 +16,12 @@ void _show_status(const V_State *vs) {
     printf("counts: %d\n", vs->k.count);
     for (int i = 0; i < vs->k.count; ++i) {
         printf("%d.\t", i);
-        const A_Const *k = &vs->k.consts[i];
-        if (k->t == A_CT_INT) {
-            printf("%d\n", k->u.n);
-        } else if (k->t == A_CT_FLOAT) {
-            printf("%lf\n", k->u.f);
-        } else {
-            printf("%s\n", k->u.s);
+        const Value *k = &vs->k.consts[i];
+        switch (k->t) {
+            case VT_INT: {printf("%d\n", k->u.n);} break;
+            case VT_FLOAT: {printf("%lf\n", k->u.f);} break;
+            case VT_STRING: {printf("%s\n", k->u.s);} break;
+            default: {error("unexpected const value type: %d", k->t);} break;
         }
     }
     printf("instrutions: %d\n", vs->ins.count);
@@ -48,24 +47,25 @@ void V_load(V_State *vs, const char *binfile) {
     fread(&vs->major, 2, 1, f);
     fread(&vs->minor, 2, 1, f);
     fread(&vs->reg.count, 2, 1, f);
-    vs->reg.regs = NEW_ARRAY(V_Reg, vs->reg.count);
+    vs->reg.regs = NEW_ARRAY(Value, vs->reg.count);
 
     /* CONSTS */
     fread(&vs->k.count, 4, 1, f);
     if (vs->k.count > 0) {
-        vs->k.consts = NEW_ARRAY(A_Const, vs->k.count);
+        vs->k.consts = NEW_ARRAY(Value, vs->k.count);
         for (int i = 0; i < vs->k.count; ++i) {
-            A_Const *k = &vs->k.consts[i];
+            Value *k = &vs->k.consts[i];
             fread(&k->t, 1, 1, f);
-            if (k->t == A_CT_INT) {
-                fread(&k->u.n, 4, 1, f);
-            } else if (k->t == A_CT_FLOAT) {
-                fread(&k->u.f, 4, 1, f);
-            } else {
-                int len = 0;
-                fread(&len, 4, 1, f);
-                k->u.s = NEW_SIZE(char, len + 1);
-                fread(k->u.s, 1, len, f);
+            switch (k->t) {
+                case VT_INT: {fread(&k->u.n, 4, 1, f);} break;
+                case VT_FLOAT: {fread(&k->u.f, 4, 1, f);} break;
+                case VT_STRING: {
+                    int len = 0;
+                    fread(&len, 4, 1, f);
+                    k->u.s = NEW_SIZE(char, len + 1);
+                    fread(k->u.s, 1, len, f);
+                } break;
+                default: {error("unexpected const value type: %d", k->t);} break;
             }
         }
     }
@@ -99,12 +99,59 @@ static void _resetstate(V_State *vs) {
     vs->ins.ip = 0;
 }
 
+static void _pstate(const V_State *vs) {
+    printf("{\n");
+    printf("  IP: %d\n", vs->ins.ip);
+    printf("  REGISTERS:\n");
+    for (int i = 0; i < vs->reg.count; ++i) {
+        const Value *r = &vs->reg.regs[i];
+        printf("    %d.\t", i);
+        switch (r->t) {
+            case VT_INT: {printf("%d\n", r->u.n);} break;
+            case VT_FLOAT: {printf("%lf\n", r->u.f);} break;
+            case VT_STRING: {printf("%s\n", r->u.s);} break;
+            case VT_BOOL: {printf("%s\n", r->u.n == 0 ? "false" : "true");} break;
+            case VT_NIL: {printf("nil\n");} break;
+            default: {printf("?\n");} break;
+        }
+    }
+    printf("}\n\n");
+}
+
+static void _copy_value(Value *dest, const Value *src) {
+    if (dest->t == VT_STRING) {
+        FREE(dest->u.s);
+    }
+    dest->t = src->t;
+    switch (src->t) {
+        case VT_INT: {dest->u.n = src->u.n;} break;
+        case VT_FLOAT: {dest->u.f = src->u.f;} break;
+        case VT_STRING: {dest->u.s = strdup(src->u.s);} break;
+        default: {/* nothing to copy */} break;
+    }
+}
+
 static void _exec_ins(V_State *vs, const A_Instr *ins) {
-    printf("exec %d: %d %d, %d, %d\n", vs->ins.ip, ins->t, ins->a, ins->b, ins->c);
+    printf("-> %d: <%s %d, %d, %d>\n", vs->ins.ip, A_opnames[ins->t], ins->a, ins->b, ins->c);
+    switch (ins->t) {
+        case OP_MOVE: {
+            _copy_value(&vs->reg.regs[ins->a], &vs->reg.regs[ins->b]);
+        } break;
+
+        case OP_LOADK: {
+            _copy_value(&vs->reg.regs[ins->a], &vs->k.consts[ins->b]);
+        } break;
+
+        default: {
+            error("instruction not handled: %d", ins->t);
+        } break;
+    }
+
 }
 
 void V_run(V_State *vs) {
     _resetstate(vs);
+    _pstate(vs);
 
     for (;;) {
         int oldip = vs->ins.ip;
@@ -117,6 +164,7 @@ void V_run(V_State *vs) {
         if (oldip == vs->ins.ip) {
             ++vs->ins.ip;
         }
+        _pstate(vs);
     }
 }
 

@@ -5,7 +5,7 @@
 
 typedef struct {
     int count;
-    A_Const *consts;
+    Value *consts;
 } V_ConstStream;
 
 typedef struct {
@@ -14,24 +14,9 @@ typedef struct {
     A_Instr *instrs;
 } V_InstrStream;
 
-typedef enum {
-    V_RT_INT,
-    V_RT_FLOAT,
-    V_RT_STRING,
-} V_RegType;
-
-typedef struct {
-    V_RegType t;
-    union {
-        int n;
-        double f;
-        char *s;
-    } u;
-} V_Reg;
-
 typedef struct {
     int count;
-    V_Reg *regs;
+    Value *regs;
 } V_RegStream;
 
 typedef struct {
