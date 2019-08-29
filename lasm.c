@@ -269,6 +269,7 @@ A_TokenType A_nexttok(A_State *as) {
 
                     char *tmp = strndup(as->src + begin, as->curidx - begin);
                     if (strcmp(tmp, "K") == 0) {free(tmp); as->curtok.t = A_TT_CONST; return as->curtok.t;}
+                    if (strcmp(tmp, "REGCOUNT") == 0) {free(tmp); as->curtok.t = A_TT_REGCOUNT; return as->curtok.t;}
 
                     int oc = _getopcode(tmp);
                     FREE(tmp);
@@ -315,6 +316,9 @@ void A_ptok(const A_Token *tok) {
         } break;
         case A_TT_CONST: {
             printf("<K> ");
+        } break;
+        case A_TT_REGCOUNT: {
+            printf("<REGCOUNT> ");
         } break;
         case A_TT_INSTR: {
             printf("<I:%s> ", _opnames[tok->u.n]);
@@ -409,6 +413,12 @@ static void _parse_instr(A_State *as) {
     list_pushback(as->instrs, ins);
 }
 
+static void _parse_regcount(A_State *as) {
+    expect(A_TT_INT);
+    as->regcount = as->curtok.u.n;
+    expect(A_TT_NEWLINE);
+}
+
 void A_parse(A_State *as) {
     _resetstate(as);
 
@@ -417,6 +427,7 @@ void A_parse(A_State *as) {
         switch (tt) {
             case A_TT_CONST: {_parse_const(as);} break;
             case A_TT_INSTR: {_parse_instr(as);} break;
+            case A_TT_REGCOUNT: {_parse_regcount(as);} break;
             case A_TT_NEWLINE: {} break;
             case A_TT_EOT: {return;}
             default: {A_FATAL("unexpected token");} break;
@@ -445,6 +456,7 @@ HEADER:
     "LUNA" (4 bytes)
     VER_MAJOR (2 bytes)
     VER_MINOR (2 bytes)
+    REGCOUNT (2 bytes)
 
 CONSTS:
     count (4 bytes)
@@ -475,6 +487,7 @@ void A_createbin(const A_State *as, const char *outfile) {
     fwrite(&num, 2, 1, f);
     num = A_VER_MINOR;
     fwrite(&num, 2, 1, f);
+    fwrite(&as->regcount, 2, 1, f);
 
     /* CONSTS */
     fwrite(&as->consts->count, 4, 1, f);

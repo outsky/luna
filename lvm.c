@@ -47,6 +47,7 @@ void V_load(V_State *vs, const char *binfile) {
     }
     fread(&vs->major, 2, 1, f);
     fread(&vs->minor, 2, 1, f);
+    fread(&vs->regcount, 2, 1, f);
 
     /* CONSTS */
     fread(&vs->k.count, 4, 1, f);

@@ -121,6 +121,7 @@ typedef enum {
     A_TT_COMMA,     /* , */
     A_TT_NEWLINE,
     A_TT_CONST,
+    A_TT_REGCOUNT,  /* count of regs */
     A_TT_INSTR,     /* instruction */
     A_TT_EOT,
 } A_TokenType;
@@ -162,6 +163,7 @@ typedef struct {
     int curline;
     int curidx;
 
+    int regcount;
     list *consts;
     list *instrs;
 
