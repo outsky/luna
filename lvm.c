@@ -142,8 +142,44 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             _copy_value(&vs->reg.regs[ins->a], &vs->k.consts[ins->b]);
         } break;
 
+        case OP_LOADBOOL: {} break;
+        case OP_LOADNIL: {} break;
+        case OP_GETUPVAL: {} break;
+        case OP_GETGLOBAL: {} break;
+        case OP_GETTABLE: {} break;
+        case OP_SETGLOBAL: {} break;
+        case OP_SETUPVAL: {} break;
+        case OP_SETTABLE: {} break;
+        case OP_NEWTABLE: {} break;
+        case OP_SELF: {} break;
+        case OP_ADD: {} break;
+        case OP_SUB: {} break;
+        case OP_MUL: {} break;
+        case OP_DIV: {} break;
+        case OP_MOD: {} break;
+        case OP_POW: {} break;
+        case OP_UNM: {} break;
+        case OP_NOT: {} break;
+        case OP_LEN: {} break;
+        case OP_CONCAT: {} break;
+        case OP_JMP: {} break;
+        case OP_EQ: {} break;
+        case OP_LT: {} break;
+        case OP_LE: {} break;
+        case OP_TEST: {} break;
+        case OP_TESTSET: {} break;
+        case OP_CALL: {} break;
+        case OP_TAILCALL: {} break;
+        case OP_RETURN: {} break;
+        case OP_FORLOOP: {} break;
+        case OP_FORPREP: {} break;
+        case OP_TFORLOOP: {} break;
+        case OP_SETLIST: {} break;
+        case OP_CLOSE: {} break;
+        case OP_CLOSURE: {} break;
+        case OP_VARARG: {} break;
         default: {
-            error("instruction not handled: %d", ins->t);
+            error("unknown instruction type: %d", ins->t);
         } break;
     }
 
