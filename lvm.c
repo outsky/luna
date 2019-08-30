@@ -335,16 +335,13 @@ void V_run(V_State *vs) {
     _pstate(vs);
 
     for (;;) {
-        int oldip = vs->ins.ip;
-        if (oldip >= vs->ins.count) {
+        if (vs->ins.ip >= vs->ins.count) {
             break;
         }
         const A_Instr *ins = &vs->ins.instrs[vs->ins.ip];
         _exec_ins(vs, ins);
 
-        if (oldip == vs->ins.ip) {
-            ++vs->ins.ip;
-        }
+        ++vs->ins.ip;
         _pstate(vs);
     }
 }
