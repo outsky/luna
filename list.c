@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "lib.h"
 #include "list.h"
 
 static lnode* _newnode(void *data) {
@@ -45,3 +46,32 @@ int list_pushback(list *l, void *data) {
     }
     return l->count++;
 }
+
+void list_remove(list *l, void *nd) {
+    if (l->head->data == nd) {
+        lnode *n = l->head;
+        l->head = n->next;
+        --l->count;
+        if (l->head == NULL) {
+            l->tail = NULL;
+        }
+        FREE(n->data);
+        FREE(n);
+        return;
+    }
+
+    for (lnode *n = l->head; n->next != NULL; n = n->next) {
+        if (n->next->data == nd) {
+            lnode *nn = n->next;
+            n->next = nn->next;
+            --l->count;
+            if (n->next == NULL) {
+                l->tail = n;
+            }
+            FREE(nn->data);
+            FREE(nn);
+            break;
+        }
+    }
+}
+

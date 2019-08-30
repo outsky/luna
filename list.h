@@ -15,5 +15,6 @@ typedef struct _list {
 list* list_new();
 void list_free(list *l);
 int list_pushback(list *l, void *data);
+void list_remove(list *l, void *nd);
 
 #endif
