@@ -42,7 +42,7 @@ void htable_remove(htable *h, const char *key) {
     for (lnode *n = l->head; n != NULL; n = n->next) {
         hnode *hn = CAST(hnode*, n->data);
         if (strcmp(key, hn->key) == 0) {
-            list_remove(l, n);
+            list_remove(l, hn);
             break;
         }
     }

@@ -75,6 +75,15 @@ extern const char *const A_opnames[];
 /* I defined */
 #define Kst(x) (-x - 1)
 
+/* creates a mask with `n' 1 bits at position `p' */
+#define MASK1(n, p) ((~((~(int)0) << n)) << p)
+
+#define GET_OP(n) (n & MASK1(A_SIZE_OP, A_POS_OP))
+#define GET_A(n) ((n & MASK1(A_SIZE_A, A_POS_A)) >> A_POS_A)
+#define GET_B(n) ((n & MASK1(A_SIZE_B, A_POS_B)) >> A_POS_B)
+#define GET_C(n) ((n & MASK1(A_SIZE_C, A_POS_C)) >> A_POS_C)
+#define GET_Bx(n) ((n & MASK1(A_SIZE_BX, A_POS_BX)) >> A_POS_BX)
+
 /*
 ** R(x) - register
 ** Kst(x) - constant (in constant table)

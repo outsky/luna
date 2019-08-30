@@ -81,14 +81,14 @@ void V_load(V_State *vs, const char *binfile) {
             A_Instr *ins = &vs->ins.instrs[i];
             int n = 0;
             fread(&n, 4, 1, f);
-            ins->t = n << (A_SIZE_A + A_SIZE_B + A_SIZE_C) >> (A_SIZE_A + A_SIZE_B + A_SIZE_C);
-            ins->a = n << (A_SIZE_B + A_SIZE_C) >> (A_SIZE_OP + A_SIZE_B + A_SIZE_C);
+            ins->t = GET_OP(n);
+            ins->a = GET_A(n);
             const A_OpMode *om = &A_OpModes[ins->t];
             if (om->m == iABC) {
-                ins->b = n << (A_SIZE_C) >> (A_SIZE_OP + A_SIZE_A + A_SIZE_C);
-                ins->c = n >> (A_SIZE_OP + A_SIZE_A + A_SIZE_B);
+                ins->b = GET_B(n);
+                ins->c = GET_C(n);
             } else {
-                ins->b = n >> (A_SIZE_OP + A_SIZE_A);
+                ins->b = GET_Bx(n);
             }
         }
     }
@@ -358,7 +358,21 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_CALL: {} break;
         case OP_TAILCALL: {} break;
         case OP_RETURN: {} break;
-        case OP_FORLOOP: {} break;
+
+        case OP_FORLOOP: {
+            float af = _get_value_float(&vs->reg.regs[ins->a]);
+            float a2f = _get_value_float(&vs->reg.regs[ins->a + 2]);
+            Value v;
+            v.t = VT_FLOAT;
+            v.u.f = af + a2f;
+            _copy_value(&vs->reg.regs[ins->a], &v);
+
+            float a1f = _get_value_float(&vs->reg.regs[ins->a + 1]);
+            if (v.u.f <= a1f) {
+                vs->ins.ip += ins->b;
+                _copy_value(&vs->reg.regs[ins->a + 3], &v);
+            }
+        } break;
 
         case OP_FORPREP: {
             float af = _get_value_float(&vs->reg.regs[ins->a]);
