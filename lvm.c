@@ -3,10 +3,13 @@
 
 V_State* V_newstate() {
     V_State *vs = NEW(V_State);
+    /* TODO: any better size? */
+    vs->globals = htable_new(1024);
     return vs;
 }
 
 void V_freestate(V_State *vs) {
+    htable_free(vs->globals);
     FREE(vs);
 }
 
@@ -115,6 +118,24 @@ static void _pstate(const V_State *vs) {
             default: {printf("?\n");} break;
         }
     }
+    printf("  GLOBALS:\n");
+    for (int i = 0; i < vs->globals->size; ++i) {
+        const list *l = vs->globals->slots[i];
+        for (lnode *n = l->head; n != NULL; n = n->next) {
+            const hnode *hn = CAST(const hnode*, n->data);
+            printf("    [%s]\t", hn->key);
+            const Value *r = CAST(const Value*, hn->value);
+            switch (r->t) {
+                case VT_INT: {printf("%d\n", r->u.n);} break;
+                case VT_FLOAT: {printf("%lf\n", r->u.f);} break;
+                case VT_STRING: {printf("%s\n", r->u.s);} break;
+                case VT_BOOL: {printf("%s\n", r->u.n == 0 ? "false" : "true");} break;
+                case VT_NIL: {printf("nil\n");} break;
+                default: {printf("?\n");} break;
+            }
+        }
+    }
+
     printf("}\n\n");
 }
 
@@ -156,7 +177,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         } break;
 
         case OP_LOADK: {
-            _copy_value(&vs->reg.regs[ins->a], &vs->k.consts[ins->b]);
+            _copy_value(&vs->reg.regs[ins->a], &vs->k.consts[Kst(ins->b)]);
         } break;
 
         case OP_LOADBOOL: {
@@ -181,9 +202,40 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         } break;
 
         case OP_GETUPVAL: {} break;
-        case OP_GETGLOBAL: {} break;
+
+        case OP_GETGLOBAL: {
+            const Value *k = &vs->k.consts[Kst(ins->b)];
+            if (k->t != VT_STRING) {
+                error("string expected by GETGLOBAL, got %d", k->t);
+            }
+
+            Value *a = &vs->reg.regs[ins->a];
+            const void *data = htable_find(vs->globals, k->u.s);
+            if (data == NULL) {
+                Value r;
+                r.t = VT_NIL;
+                _copy_value(a, &r);
+            } else {
+                const Value *r = CAST(const Value*, data);
+                _copy_value(a, r);
+            }
+        } break;
+
         case OP_GETTABLE: {} break;
-        case OP_SETGLOBAL: {} break;
+
+        case OP_SETGLOBAL: {
+            int idx = Kst(ins->b);
+            const Value *k = &vs->k.consts[idx];
+            if (k->t != VT_STRING) {
+                error("string expected by SETGLOBAL, got %d idx %d(%d)", k->t, idx, ins->b);
+            }
+            
+            const Value *a = &vs->reg.regs[ins->a];
+            Value *nv = NEW(Value);
+            _copy_value(nv, a);
+            htable_add(vs->globals, k->u.s, nv);
+        } break;
+
         case OP_SETUPVAL: {} break;
         case OP_SETTABLE: {} break;
         case OP_NEWTABLE: {} break;

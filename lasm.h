@@ -72,6 +72,8 @@ extern const char *const A_opnames[];
 /* code a constant index as a RK value */
 #define RKASK(x)	((x) | BITRK)
 
+/* I defined */
+#define Kst(x) (-x - 1)
 
 /*
 ** R(x) - register
