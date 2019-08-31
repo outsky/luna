@@ -181,9 +181,6 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         } break;
 
         case OP_LOADBOOL: {
-            /*	A B C	R(A) := (Bool)B; if (C) pc++			*/
-            /* TODO: what does this `if (C) pc++' mean?
-            The pc will increase automatically however. I wonder */
             Value src;
             src.t = VT_BOOL;
             src.u.n = ins->b != 0;
@@ -321,7 +318,6 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_EQ:
         case OP_LT:
         case OP_LE: {
-            /* TODO: again, confusing */
             const Value *b = RK(vs, ins->b);
             const Value *c = RK(vs, ins->c);
             float bf = _get_value_float(b);

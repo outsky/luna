@@ -204,7 +204,7 @@ A_TokenType A_nexttok(A_State *as) {
                     break;
                 }
 
-                if (c == ']' || c == ',' || isspace(c)) {
+                if (c == ']' || c == ',' || c == ';' || isspace(c)) {
                     --as->curidx;
                     as->curtok.t = A_TT_INT;
                     char *tmp = strndup(as->src + begin, as->curidx - begin);
