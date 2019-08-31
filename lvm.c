@@ -169,6 +169,8 @@ static double _get_value_float(const Value *v) {
     return 0.0;
 }
 
+#define NOT_IMP error("op not imp: %s(%d)", A_opnames[ins->t], ins->t)
+
 static void _exec_ins(V_State *vs, const A_Instr *ins) {
     printf("-> %d: <%s %d, %d, %d>\n", vs->ins.ip, A_opnames[ins->t], ins->a, ins->b, ins->c);
     switch (ins->t) {
@@ -198,7 +200,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             }
         } break;
 
-        case OP_GETUPVAL: {} break;
+        case OP_GETUPVAL: {NOT_IMP;} break;
 
         case OP_GETGLOBAL: {
             const Value *k = &vs->k.consts[Kst(ins->b)];
@@ -218,7 +220,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             }
         } break;
 
-        case OP_GETTABLE: {} break;
+        case OP_GETTABLE: {NOT_IMP;} break;
 
         case OP_SETGLOBAL: {
             int idx = Kst(ins->b);
@@ -233,10 +235,10 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             htable_add(vs->globals, k->u.s, nv);
         } break;
 
-        case OP_SETUPVAL: {} break;
-        case OP_SETTABLE: {} break;
-        case OP_NEWTABLE: {} break;
-        case OP_SELF: {} break;
+        case OP_SETUPVAL: {NOT_IMP;} break;
+        case OP_SETTABLE: {NOT_IMP;} break;
+        case OP_NEWTABLE: {NOT_IMP;} break;
+        case OP_SELF: {NOT_IMP;} break;
 
         case OP_ADD:
         case OP_SUB:
@@ -308,8 +310,8 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             _copy_value(&vs->reg.regs[ins->a], &v);
         } break;
 
-        case OP_LEN: {} break;
-        case OP_CONCAT: {} break;
+        case OP_LEN: {NOT_IMP;} break;
+        case OP_CONCAT: {NOT_IMP;} break;
 
         case OP_JMP: {
             vs->ins.ip += ins->b;
@@ -351,9 +353,9 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             }
         } break;
 
-        case OP_CALL: {} break;
-        case OP_TAILCALL: {} break;
-        case OP_RETURN: {} break;
+        case OP_CALL: {NOT_IMP;} break;
+        case OP_TAILCALL: {NOT_IMP;} break;
+        case OP_RETURN: {NOT_IMP;} break;
 
         case OP_FORLOOP: {
             float af = _get_value_float(&vs->reg.regs[ins->a]);
@@ -380,11 +382,11 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             vs->ins.ip += ins->b;
         } break;
 
-        case OP_TFORLOOP: {} break;
-        case OP_SETLIST: {} break;
-        case OP_CLOSE: {} break;
-        case OP_CLOSURE: {} break;
-        case OP_VARARG: {} break;
+        case OP_TFORLOOP: {NOT_IMP;} break;
+        case OP_SETLIST: {NOT_IMP;} break;
+        case OP_CLOSE: {NOT_IMP;} break;
+        case OP_CLOSURE: {NOT_IMP;} break;
+        case OP_VARARG: {NOT_IMP;} break;
         default: {
             error("unknown instruction type: %d", ins->t);
         } break;
