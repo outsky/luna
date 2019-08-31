@@ -1,10 +1,13 @@
-#ifndef lib_h
-#define lib_h
+#ifndef luna_h
+#define luna_h
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <stdarg.h>
+#include <ctype.h>
+#include "luna.h"
 
 
 #define CAST(T, v) ((T)(v))
@@ -20,5 +23,28 @@
 void errorf(const char *where, const char *fmt, ...);
 void snapshot(const char* code, int pos, int line);
 char* load_file(const char *filename);
+
+struct ltable;
+typedef enum {
+    VT_INVALID,
+    VT_INT,
+    VT_FLOAT,
+    VT_STRING,
+    VT_BOOL,
+    VT_NIL,
+    VT_TABLE,
+} ValueType;
+
+typedef struct {
+    ValueType t;
+    union {
+        int n;
+        double f;
+        char *s;
+        struct ltable *lt;
+    } u;
+} Value;
+
+void _copy_value(Value *dest, const Value *src);
 
 #endif

@@ -1,5 +1,5 @@
 #include <ctype.h>
-#include "lib.h"
+#include "luna.h"
 #include "lasm.h"
 
 #define A_FATAL(...) snapshot(as->src, as->curidx, as->curline); error(__VA_ARGS__)

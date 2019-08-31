@@ -1,9 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdarg.h>
-#include "lib.h"
+#include "luna.h"
 
 static void print_error(const char *where, const char *label, const char *fmt, va_list args) {
     fprintf(stderr, "[%s] ", label);
@@ -62,5 +57,19 @@ char* load_file(const char *filename) {
     fread(fdata, sizeof(char), fsize, f);
     fclose(f); f = NULL;
     return fdata;
+}
+
+void _copy_value(Value *dest, const Value *src) {
+    if (dest->t == VT_STRING) {
+        FREE(dest->u.s);
+    }
+    dest->t = src->t;
+    switch (src->t) {
+        case VT_INT: {dest->u.n = src->u.n;} break;
+        case VT_FLOAT: {dest->u.f = src->u.f;} break;
+        case VT_STRING: {dest->u.s = strdup(src->u.s);} break;
+        case VT_TABLE: {dest->u.lt = src->u.lt;} break;
+        default: {/* nothing to copy */} break;
+    }
 }
 

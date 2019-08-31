@@ -1,4 +1,4 @@
-#include "lib.h"
+#include "luna.h"
 #include "htable.h"
 
 htable* htable_new(int size) {

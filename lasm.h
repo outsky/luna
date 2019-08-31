@@ -2,6 +2,7 @@
 #define lasm_h
 
 #include "list.h"
+#include "ltable.h"
 
 #define A_VER_MAJOR 5
 #define A_VER_MINOR 1
@@ -171,24 +172,6 @@ typedef struct {
         char *s;
     } u;
 } A_Token;
-
-typedef enum {
-    VT_INVALID,
-    VT_INT,
-    VT_FLOAT,
-    VT_STRING,
-    VT_BOOL,
-    VT_NIL,
-} ValueType;
-
-typedef struct {
-    ValueType t;
-    union {
-        int n;
-        double f;
-        char *s;
-    } u;
-} Value;
 
 typedef struct {
     A_OpCode t;

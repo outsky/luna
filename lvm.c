@@ -1,5 +1,6 @@
-#include "lib.h"
+#include "luna.h"
 #include "lvm.h"
+#include "ltable.h"
 
 V_State* V_newstate() {
     V_State *vs = NEW(V_State);
@@ -131,25 +132,21 @@ static void _pstate(const V_State *vs) {
                 case VT_STRING: {printf("%s\n", r->u.s);} break;
                 case VT_BOOL: {printf("%s\n", r->u.n == 0 ? "false" : "true");} break;
                 case VT_NIL: {printf("nil\n");} break;
-                default: {printf("?\n");} break;
+                case VT_TABLE: {
+                    const ltable *lt = r->u.lt;
+                    int hashcount = 0;
+                    for (int i = 0; i < lt->hash->size; ++i) {
+                        const list *l = lt->hash->slots[i];
+                        hashcount += l->count;
+                    }
+                    printf("table(%d, %d):%p\n", lt->arraysize, hashcount, lt);
+                } break;
+                default: {printf("?(%d)\n", r->t);} break;
             }
         }
     }
 
     printf("}\n\n");
-}
-
-static void _copy_value(Value *dest, const Value *src) {
-    if (dest->t == VT_STRING) {
-        FREE(dest->u.s);
-    }
-    dest->t = src->t;
-    switch (src->t) {
-        case VT_INT: {dest->u.n = src->u.n;} break;
-        case VT_FLOAT: {dest->u.f = src->u.f;} break;
-        case VT_STRING: {dest->u.s = strdup(src->u.s);} break;
-        default: {/* nothing to copy */} break;
-    }
 }
 
 static Value* RK(V_State *vs, int x) {
@@ -237,7 +234,14 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
 
         case OP_SETUPVAL: {NOT_IMP;} break;
         case OP_SETTABLE: {NOT_IMP;} break;
-        case OP_NEWTABLE: {NOT_IMP;} break;
+
+        case OP_NEWTABLE: {
+            Value v;
+            v.t = VT_TABLE;
+            v.u.lt = ltable_new(ins->b);    /* TODO: param `c' not used */
+            _copy_value(&vs->reg.regs[ins->a], &v);
+        } break;
+
         case OP_SELF: {NOT_IMP;} break;
 
         case OP_ADD:
@@ -383,7 +387,14 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         } break;
 
         case OP_TFORLOOP: {NOT_IMP;} break;
-        case OP_SETLIST: {NOT_IMP;} break;
+
+        case OP_SETLIST: {
+            /* TODO: check R[a] ltale type */
+            for (int i = 1; i <= ins->b; ++i) {
+                ltable_setarray(vs->reg.regs[ins->a].u.lt, i - 1, &vs->reg.regs[ins->a + i]);
+            }
+        } break;
+
         case OP_CLOSE: {NOT_IMP;} break;
         case OP_CLOSURE: {NOT_IMP;} break;
         case OP_VARARG: {NOT_IMP;} break;
