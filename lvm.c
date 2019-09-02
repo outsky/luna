@@ -404,7 +404,28 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             _copy_value(&vs->reg.regs[ins->a], &v);
         } break;
 
-        case OP_CONCAT: {NOT_IMP;} break;
+        case OP_CONCAT: {
+            int maxlen = 128; /* TODO: better value? */
+            int curlen = 0;
+            char *buff = NEW_ARRAY(char, maxlen);
+            for (int i = ins->u.bc.b; i <= ins->u.bc.c; ++i) {
+                const Value *v = &vs->reg.regs[i];
+                /* TODO: check string type */
+                const char *s = v->u.s;
+                int len = strlen(s);
+                if (curlen + len >= maxlen) {
+                    maxlen = 2 * (curlen + len);
+                    buff = realloc(buff, maxlen);
+                }
+                strcpy(buff + curlen, s);
+                curlen += len;
+            }
+            Value vnew;
+            vnew.t = VT_STRING;
+            vnew.u.s = buff;
+            _copy_value(&vs->reg.regs[ins->a], &vnew);
+            FREE(buff);
+        } break;
 
         case OP_JMP: {
             vs->ins.ip += ins->u.bx;
