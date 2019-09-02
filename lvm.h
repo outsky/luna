@@ -16,17 +16,12 @@ typedef struct {
 } V_InstrStream;
 
 typedef struct {
-    int count;
-    Value *regs;
-} V_RegStream;
-
-typedef struct {
     int major;
     int minor;
 
     ltable *globals;
 
-    V_RegStream reg;
+    V_ValueStream reg;
     V_ValueStream k;
     V_InstrStream ins;
 } V_State;

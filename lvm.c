@@ -53,7 +53,7 @@ void V_load(V_State *vs, const char *binfile) {
     fread(&vs->major, 2, 1, f);
     fread(&vs->minor, 2, 1, f);
     fread(&vs->reg.count, 2, 1, f);
-    vs->reg.regs = NEW_ARRAY(Value, vs->reg.count);
+    vs->reg.values = NEW_ARRAY(Value, vs->reg.count);
 
     /* CONSTS */
     fread(&vs->k.count, 4, 1, f);
@@ -141,7 +141,7 @@ static void _pstate(const V_State *vs) {
     printf("  IP: %d\n", vs->ins.ip);
     printf("  REGISTERS:\n");
     for (int i = 0; i < vs->reg.count; ++i) {
-        const Value *r = &vs->reg.regs[i];
+        const Value *r = &vs->reg.values[i];
         printf("    %d.\t", i);
         switch (r->t) {
             case VT_INT: {printf("%d\n", r->u.n);} break;
@@ -177,7 +177,7 @@ static Value* RK(V_State *vs, int x) {
     if (x < 0) {
         return &vs->k.values[Kst(x)];
     }
-    return &vs->reg.regs[x];
+    return &vs->reg.values[x];
 }
 
 static double _get_value_float(const Value *v) {
@@ -223,18 +223,18 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
 
     switch (ins->t) {
         case OP_MOVE: {
-            _copy_value(&vs->reg.regs[ins->a], &vs->reg.regs[ins->u.bc.b]);
+            _copy_value(&vs->reg.values[ins->a], &vs->reg.values[ins->u.bc.b]);
         } break;
 
         case OP_LOADK: {
-            _copy_value(&vs->reg.regs[ins->a], &vs->k.values[Kst(ins->u.bx)]);
+            _copy_value(&vs->reg.values[ins->a], &vs->k.values[Kst(ins->u.bx)]);
         } break;
 
         case OP_LOADBOOL: {
             Value src;
             src.t = VT_BOOL;
             src.u.n = ins->u.bc.b != 0;
-            _copy_value(&vs->reg.regs[ins->a], &src);
+            _copy_value(&vs->reg.values[ins->a], &src);
             if (ins->u.bc.c) {
                 ++vs->ins.ip;
             }
@@ -244,7 +244,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             Value src;
             src.t = VT_NIL;
             for (int i = ins->a; i <= ins->u.bc.b; ++i) {
-                _copy_value(&vs->reg.regs[i], &src);
+                _copy_value(&vs->reg.values[i], &src);
             }
         } break;
 
@@ -257,7 +257,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             }
 
             const void *data = ltable_gettable(vs->globals, k->u.s);
-            Value *a = &vs->reg.regs[ins->a];
+            Value *a = &vs->reg.values[ins->a];
             if (data == NULL) {
                 Value r;
                 r.t = VT_NIL;
@@ -269,8 +269,8 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         } break;
 
         case OP_GETTABLE: {
-            Value *a = &vs->reg.regs[ins->a];
-            const Value *b = &vs->reg.regs[ins->u.bc.b];
+            Value *a = &vs->reg.values[ins->a];
+            const Value *b = &vs->reg.values[ins->u.bc.b];
             /* TODO: check b table */
             const Value *c = RK(vs, ins->u.bc.c);
             /* TODO: check c string */
@@ -291,14 +291,14 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
                 error("string expected by SETGLOBAL, got %d idx %d(%d)", k->t, idx, ins->u.bx);
             }
             
-            const Value *a = &vs->reg.regs[ins->a];
+            const Value *a = &vs->reg.values[ins->a];
             ltable_settable(vs->globals, k->u.s, a);
         } break;
 
         case OP_SETUPVAL: {NOT_IMP;} break;
 
         case OP_SETTABLE: {
-            Value *a = &vs->reg.regs[ins->a];
+            Value *a = &vs->reg.values[ins->a];
             /* TODO: check a table */
             const Value *b = RK(vs, ins->u.bc.b);
             /* TODO: check b string */
@@ -310,18 +310,18 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             Value v;
             v.t = VT_TABLE;
             v.u.lt = ltable_new(ins->u.bc.b);    /* TODO: param `c' not used */
-            _copy_value(&vs->reg.regs[ins->a], &v);
+            _copy_value(&vs->reg.values[ins->a], &v);
         } break;
 
         case OP_SELF: {
-            const Value *b = &vs->reg.regs[ins->u.bc.b];
+            const Value *b = &vs->reg.values[ins->u.bc.b];
             /* TODO: check b table */
 
-            _copy_value(&vs->reg.regs[ins->a + 1], b);
+            _copy_value(&vs->reg.values[ins->a + 1], b);
 
             const Value *c = RK(vs, ins->u.bc.c);
             const Value *v = ltable_gettable(b->u.lt, c->u.s);
-            _copy_value(&vs->reg.regs[ins->a], v);
+            _copy_value(&vs->reg.values[ins->a], v);
         } break;
 
         case OP_ADD:
@@ -365,13 +365,13 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             } else {
                 v.u.f = ca;
             }
-            _copy_value(&vs->reg.regs[ins->a], &v);
+            _copy_value(&vs->reg.values[ins->a], &v);
         } break;
 
         case OP_UNM: {
             Value v;
             v.t = VT_INVALID;
-            _copy_value(&v, &vs->reg.regs[ins->u.bc.b]);
+            _copy_value(&v, &vs->reg.values[ins->u.bc.b]);
             if (v.t == VT_INT) {
                 v.u.n = -v.u.n;
             } else if (v.t == VT_FLOAT) {
@@ -379,29 +379,29 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             } else {
                 error("value type error: %d", v.t);
             }
-            _copy_value(&vs->reg.regs[ins->a], &v);
+            _copy_value(&vs->reg.values[ins->a], &v);
         } break;
 
         case OP_NOT: {
             Value v;
             v.t = VT_BOOL;
-            const Value *b = &vs->reg.regs[ins->u.bc.b];
+            const Value *b = &vs->reg.values[ins->u.bc.b];
             switch (b->t) {
                 case VT_BOOL: {v.u.n = b->u.n == 0;} break;
                 case VT_NIL: {v.u.n = 1;} break;
                 default: {v.u.n = 0;} break;
             }
-            _copy_value(&vs->reg.regs[ins->a], &v);
+            _copy_value(&vs->reg.values[ins->a], &v);
         } break;
 
         case OP_LEN: {
-            const Value *b = &vs->reg.regs[ins->u.bc.b];
+            const Value *b = &vs->reg.values[ins->u.bc.b];
             /* TODO: only support table? */
             int len = ltable_len(b->u.lt);
             Value v;
             v.t = VT_INT;
             v.u.n = len;
-            _copy_value(&vs->reg.regs[ins->a], &v);
+            _copy_value(&vs->reg.values[ins->a], &v);
         } break;
 
         case OP_CONCAT: {
@@ -409,7 +409,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             int curlen = 0;
             char *buff = NEW_ARRAY(char, maxlen);
             for (int i = ins->u.bc.b; i <= ins->u.bc.c; ++i) {
-                const Value *v = &vs->reg.regs[i];
+                const Value *v = &vs->reg.values[i];
                 /* TODO: check string type */
                 const char *s = v->u.s;
                 int len = strlen(s);
@@ -423,7 +423,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             Value vnew;
             vnew.t = VT_STRING;
             vnew.u.s = buff;
-            _copy_value(&vs->reg.regs[ins->a], &vnew);
+            _copy_value(&vs->reg.values[ins->a], &vnew);
             FREE(buff);
         } break;
 
@@ -453,15 +453,15 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_TEST: {
             /* if not (R(A) <=> C) then pc++ */
             /* TODO: what does the `<=>' mean? I just consider it to `=='*/
-            int a = (int)_get_value_float(&vs->reg.regs[ins->a]);
+            int a = (int)_get_value_float(&vs->reg.values[ins->a]);
             if (a != ins->u.bc.c) {++vs->ins.ip;}
         } break;
 
         case OP_TESTSET: {
             /* TODO: as OP_TEST, confusing `<=>' */
-            int b = (int)_get_value_float(&vs->reg.regs[ins->u.bc.b]);
+            int b = (int)_get_value_float(&vs->reg.values[ins->u.bc.b]);
             if (b == ins->u.bc.c) {
-                _copy_value(&vs->reg.regs[ins->a], &vs->reg.regs[ins->u.bc.b]);
+                _copy_value(&vs->reg.values[ins->a], &vs->reg.values[ins->u.bc.b]);
             } else {
                 ++vs->ins.ip;
             }
@@ -472,27 +472,27 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_RETURN: {NOT_IMP;} break;
 
         case OP_FORLOOP: {
-            float af = _get_value_float(&vs->reg.regs[ins->a]);
-            float a2f = _get_value_float(&vs->reg.regs[ins->a + 2]);
+            float af = _get_value_float(&vs->reg.values[ins->a]);
+            float a2f = _get_value_float(&vs->reg.values[ins->a + 2]);
             Value v;
             v.t = VT_FLOAT;
             v.u.f = af + a2f;
-            _copy_value(&vs->reg.regs[ins->a], &v);
+            _copy_value(&vs->reg.values[ins->a], &v);
 
-            float a1f = _get_value_float(&vs->reg.regs[ins->a + 1]);
+            float a1f = _get_value_float(&vs->reg.values[ins->a + 1]);
             if (v.u.f <= a1f) {
                 vs->ins.ip += ins->u.bx;
-                _copy_value(&vs->reg.regs[ins->a + 3], &v);
+                _copy_value(&vs->reg.values[ins->a + 3], &v);
             }
         } break;
 
         case OP_FORPREP: {
-            float af = _get_value_float(&vs->reg.regs[ins->a]);
-            float a2f = _get_value_float(&vs->reg.regs[ins->a + 2]);
+            float af = _get_value_float(&vs->reg.values[ins->a]);
+            float a2f = _get_value_float(&vs->reg.values[ins->a + 2]);
             Value v;
             v.t = VT_FLOAT;
             v.u.f = af - a2f;
-            _copy_value(&vs->reg.regs[ins->a], &v);
+            _copy_value(&vs->reg.values[ins->a], &v);
             vs->ins.ip += ins->u.bx;
         } break;
 
@@ -501,7 +501,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_SETLIST: {
             /* TODO: check R[a] ltale type */
             for (int i = 1; i <= ins->u.bc.b; ++i) {
-                ltable_setarray(vs->reg.regs[ins->a].u.lt, i - 1, &vs->reg.regs[ins->a + i]);
+                ltable_setarray(vs->reg.values[ins->a].u.lt, i - 1, &vs->reg.values[ins->a + i]);
             }
         } break;
 
