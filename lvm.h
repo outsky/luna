@@ -6,8 +6,8 @@
 
 typedef struct {
     int count;
-    Value *consts;
-} V_ConstStream;
+    Value *values;
+} V_ValueStream;
 
 typedef struct {
     int count;
@@ -27,7 +27,7 @@ typedef struct {
     ltable *globals;
 
     V_RegStream reg;
-    V_ConstStream k;
+    V_ValueStream k;
     V_InstrStream ins;
 } V_State;
 

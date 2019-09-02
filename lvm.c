@@ -22,7 +22,7 @@ void _show_status(const V_State *vs) {
     printf("counts: %d\n", vs->k.count);
     for (int i = 0; i < vs->k.count; ++i) {
         printf("%d.\t", i);
-        const Value *k = &vs->k.consts[i];
+        const Value *k = &vs->k.values[i];
         switch (k->t) {
             case VT_INT: {printf("%d\n", k->u.n);} break;
             case VT_FLOAT: {printf("%lf\n", k->u.f);} break;
@@ -58,9 +58,9 @@ void V_load(V_State *vs, const char *binfile) {
     /* CONSTS */
     fread(&vs->k.count, 4, 1, f);
     if (vs->k.count > 0) {
-        vs->k.consts = NEW_ARRAY(Value, vs->k.count);
+        vs->k.values = NEW_ARRAY(Value, vs->k.count);
         for (int i = 0; i < vs->k.count; ++i) {
-            Value *k = &vs->k.consts[i];
+            Value *k = &vs->k.values[i];
             fread(&k->t, 1, 1, f);
             switch (k->t) {
                 case VT_INT: {fread(&k->u.n, 4, 1, f);} break;
@@ -175,7 +175,7 @@ static void _pstate(const V_State *vs) {
 
 static Value* RK(V_State *vs, int x) {
     if (x < 0) {
-        return &vs->k.consts[Kst(x)];
+        return &vs->k.values[Kst(x)];
     }
     return &vs->reg.regs[x];
 }
@@ -227,7 +227,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         } break;
 
         case OP_LOADK: {
-            _copy_value(&vs->reg.regs[ins->a], &vs->k.consts[Kst(ins->u.bx)]);
+            _copy_value(&vs->reg.regs[ins->a], &vs->k.values[Kst(ins->u.bx)]);
         } break;
 
         case OP_LOADBOOL: {
@@ -251,7 +251,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_GETUPVAL: {NOT_IMP;} break;
 
         case OP_GETGLOBAL: {
-            const Value *k = &vs->k.consts[Kst(ins->u.bx)];
+            const Value *k = &vs->k.values[Kst(ins->u.bx)];
             if (k->t != VT_STRING) {
                 error("string expected by GETGLOBAL, got %d", k->t);
             }
@@ -286,7 +286,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
 
         case OP_SETGLOBAL: {
             int idx = Kst(ins->u.bx);
-            const Value *k = &vs->k.consts[idx];
+            const Value *k = &vs->k.values[idx];
             if (k->t != VT_STRING) {
                 error("string expected by SETGLOBAL, got %d idx %d(%d)", k->t, idx, ins->u.bx);
             }
