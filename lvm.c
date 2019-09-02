@@ -162,7 +162,7 @@ static void _pstate(const V_State *vs) {
         const list *l = vs->globals->hash->slots[i];
         for (lnode *n = l->head; n != NULL; n = n->next) {
             const hnode *hn = CAST(const hnode*, n->data);
-            printf("    [%s]\t", hn->key);
+            printf("    [\"%s\"]\t", hn->key);
             const Value *v = CAST(const Value*, hn->value);
             _pvalue(v);
         }
