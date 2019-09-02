@@ -15,3 +15,9 @@ void ltable_setarray(ltable *lt, int idx, const Value *v) {
     }
     _copy_value(&lt->array[idx], v);
 }
+
+void ltable_settable(ltable *lt, const char *key, const Value *v) {
+    Value *vcopy = NEW(Value);
+    _copy_value(vcopy, v);
+    htable_add(lt->hash, key, vcopy);
+}

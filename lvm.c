@@ -275,7 +275,15 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         } break;
 
         case OP_SETUPVAL: {NOT_IMP;} break;
-        case OP_SETTABLE: {NOT_IMP;} break;
+
+        case OP_SETTABLE: {
+            Value *a = &vs->reg.regs[ins->a];
+            /* TODO: check a table */
+            const Value *b = RK(vs, ins->u.bc.b);
+            /* TODO: check b string */
+            const Value *c = RK(vs, ins->u.bc.c);
+            ltable_settable(a->u.lt, b->u.s, c);
+        } break;
 
         case OP_NEWTABLE: {
             Value v;
