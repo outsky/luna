@@ -9,6 +9,9 @@ ltable* ltable_new(int arraysize) {
     return t;
 }
 
+void ltable_free(ltable *lt) {
+}
+
 void ltable_setarray(ltable *lt, int idx, const Value *v) {
     if (idx >= lt->arraysize) {
         error("array index overflow: index %d size %d", idx, lt->arraysize);

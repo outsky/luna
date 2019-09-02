@@ -7,12 +7,12 @@ static void _printins(const V_State *vs, const A_Instr *ins);
 V_State* V_newstate() {
     V_State *vs = NEW(V_State);
     /* TODO: any better size? */
-    vs->globals = htable_new(1024);
+    vs->globals = ltable_new(0);
     return vs;
 }
 
 void V_freestate(V_State *vs) {
-    htable_free(vs->globals);
+    ltable_free(vs->globals);
     FREE(vs);
 }
 
@@ -116,6 +116,26 @@ static void _resetstate(V_State *vs) {
     vs->ins.ip = 0;
 }
 
+static void _pvalue(const Value *v) {
+    switch (v->t) {
+        case VT_INT: {printf("%d\n", v->u.n);} break;
+        case VT_FLOAT: {printf("%lf\n", v->u.f);} break;
+        case VT_STRING: {printf("%s\n", v->u.s);} break;
+        case VT_BOOL: {printf("%s\n", v->u.n == 0 ? "false" : "true");} break;
+        case VT_NIL: {printf("nil\n");} break;
+        case VT_TABLE: {
+            const ltable *lt = v->u.lt;
+            int hashcount = 0;
+            for (int i = 0; i < lt->hash->size; ++i) {
+                const list *l = lt->hash->slots[i];
+                hashcount += l->count;
+            }
+            printf("table(%d, %d):%p\n", lt->arraysize, hashcount, lt);
+        } break;
+        default: {printf("?(%d)\n", v->t);} break;
+    }
+}
+
 static void _pstate(const V_State *vs) {
     printf("{\n");
     printf("  IP: %d\n", vs->ins.ip);
@@ -133,29 +153,18 @@ static void _pstate(const V_State *vs) {
         }
     }
     printf("  GLOBALS:\n");
-    for (int i = 0; i < vs->globals->size; ++i) {
-        const list *l = vs->globals->slots[i];
+    for (int i = 0; i < vs->globals->arraysize; ++i) {
+        const Value *v = &vs->globals->array[i];
+        printf("    [%d]\t", i);
+        _pvalue(v);
+    }
+    for (int i = 0; i < vs->globals->hash->size; ++i) {
+        const list *l = vs->globals->hash->slots[i];
         for (lnode *n = l->head; n != NULL; n = n->next) {
             const hnode *hn = CAST(const hnode*, n->data);
             printf("    [%s]\t", hn->key);
-            const Value *r = CAST(const Value*, hn->value);
-            switch (r->t) {
-                case VT_INT: {printf("%d\n", r->u.n);} break;
-                case VT_FLOAT: {printf("%lf\n", r->u.f);} break;
-                case VT_STRING: {printf("%s\n", r->u.s);} break;
-                case VT_BOOL: {printf("%s\n", r->u.n == 0 ? "false" : "true");} break;
-                case VT_NIL: {printf("nil\n");} break;
-                case VT_TABLE: {
-                    const ltable *lt = r->u.lt;
-                    int hashcount = 0;
-                    for (int i = 0; i < lt->hash->size; ++i) {
-                        const list *l = lt->hash->slots[i];
-                        hashcount += l->count;
-                    }
-                    printf("table(%d, %d):%p\n", lt->arraysize, hashcount, lt);
-                } break;
-                default: {printf("?(%d)\n", r->t);} break;
-            }
+            const Value *v = CAST(const Value*, hn->value);
+            _pvalue(v);
         }
     }
 
@@ -247,8 +256,8 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
                 error("string expected by GETGLOBAL, got %d", k->t);
             }
 
+            const void *data = ltable_gettable(vs->globals, k->u.s);
             Value *a = &vs->reg.regs[ins->a];
-            const void *data = htable_find(vs->globals, k->u.s);
             if (data == NULL) {
                 Value r;
                 r.t = VT_NIL;
@@ -283,9 +292,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             }
             
             const Value *a = &vs->reg.regs[ins->a];
-            Value *nv = NEW(Value);
-            _copy_value(nv, a);
-            htable_add(vs->globals, k->u.s, nv);
+            ltable_settable(vs->globals, k->u.s, a);
         } break;
 
         case OP_SETUPVAL: {NOT_IMP;} break;

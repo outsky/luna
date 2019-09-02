@@ -2,7 +2,7 @@
 #define lvm_h
 
 #include "lasm.h"
-#include "htable.h"
+#include "ltable.h"
 
 typedef struct {
     int count;
@@ -24,7 +24,7 @@ typedef struct {
     int major;
     int minor;
 
-    htable *globals;
+    ltable *globals;
 
     V_RegStream reg;
     V_ConstStream k;
