@@ -306,7 +306,16 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             _copy_value(&vs->reg.regs[ins->a], &v);
         } break;
 
-        case OP_SELF: {NOT_IMP;} break;
+        case OP_SELF: {
+            const Value *b = &vs->reg.regs[ins->u.bc.b];
+            /* TODO: check b table */
+
+            _copy_value(&vs->reg.regs[ins->a + 1], b);
+
+            const Value *c = RK(vs, ins->u.bc.c);
+            const Value *v = ltable_gettable(b->u.lt, c->u.s);
+            _copy_value(&vs->reg.regs[ins->a], v);
+        } break;
 
         case OP_ADD:
         case OP_SUB:
