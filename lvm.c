@@ -2,6 +2,8 @@
 #include "lvm.h"
 #include "ltable.h"
 
+static void _printins(const V_State *vs, const A_Instr *ins);
+
 V_State* V_newstate() {
     V_State *vs = NEW(V_State);
     /* TODO: any better size? */
@@ -32,7 +34,7 @@ void _show_status(const V_State *vs) {
     for (int i = 0; i < vs->ins.count; ++i) {
         const A_Instr *ins = &vs->ins.instrs[i];
         printf("%d.\t", i);
-        printf("%d\t%d, %d, %d\n", ins->t, ins->a, ins->b, ins->c);
+        _printins(vs, ins);
     }
 }
 
@@ -80,16 +82,27 @@ void V_load(V_State *vs, const char *binfile) {
         vs->ins.instrs = NEW_ARRAY(A_Instr, vs->ins.count);
         for (int i = 0; i < vs->ins.count; ++i) {
             A_Instr *ins = &vs->ins.instrs[i];
-            int n = 0;
-            fread(&n, 4, 1, f);
-            ins->t = GET_OP(n);
-            ins->a = GET_A(n);
+            fread(&ins->t, 1, 1, f);
             const A_OpMode *om = &A_OpModes[ins->t];
-            if (om->m == iABC) {
-                ins->b = GET_B(n);
-                ins->c = GET_C(n);
-            } else {
-                ins->b = GET_Bx(n);
+            if (om->a != OpArgN) {
+                fread(&ins->a, 1, 1, f);
+            }
+            switch (om->m) {
+                case iABC: {
+                    if (om->b != OpArgN) {
+                        fread(&ins->u.bc.b, 2, 1, f);
+                    }
+                    if (om->c != OpArgN) {
+                        fread(&ins->u.bc.c, 2, 1, f);
+                    }
+                } break;
+
+                case iABx:
+                case iAsBx: {
+                    if (om->b != OpArgN) {
+                        fread(&ins->u.bx, 4, 1, f);
+                    }
+                } break;
             }
         }
     }
@@ -149,9 +162,11 @@ static void _pstate(const V_State *vs) {
     printf("}\n\n");
 }
 
+#define Kst(x) (-x - 1)
+
 static Value* RK(V_State *vs, int x) {
-    if (ISK(x)) {
-        return &vs->k.consts[INDEXK(x)];
+    if (x < 0) {
+        return &vs->k.consts[Kst(x)];
     }
     return &vs->reg.regs[x];
 }
@@ -168,23 +183,50 @@ static double _get_value_float(const Value *v) {
 
 #define NOT_IMP error("op not imp: %s(%d)", A_opnames[ins->t], ins->t)
 
+static void _printins(const V_State *vs, const A_Instr *ins) {
+    printf("<%s", A_opnames[ins->t]);
+    const A_OpMode *om = &A_OpModes[ins->t];
+    if (om->a != OpArgN) {
+        printf(" %d", ins->a);
+    }
+    switch (om->m) {
+        case iABC: {
+            if (om->b != OpArgN) {
+                printf(" %d", ins->u.bc.b);
+            }
+            if (om->c != OpArgN) {
+                printf(" %d", ins->u.bc.c);
+            }
+        } break;
+
+        case iABx:
+        case iAsBx: {
+            if (om->b != OpArgN) {
+                printf(" %d", ins->u.bx);
+            }
+        } break;
+    }
+    printf(">\n");
+}
+
 static void _exec_ins(V_State *vs, const A_Instr *ins) {
-    printf("-> %d: <%s %d, %d, %d>\n", vs->ins.ip, A_opnames[ins->t], ins->a, ins->b, ins->c);
+    _printins(vs, ins);
+
     switch (ins->t) {
         case OP_MOVE: {
-            _copy_value(&vs->reg.regs[ins->a], &vs->reg.regs[ins->b]);
+            _copy_value(&vs->reg.regs[ins->a], &vs->reg.regs[ins->u.bc.b]);
         } break;
 
         case OP_LOADK: {
-            _copy_value(&vs->reg.regs[ins->a], &vs->k.consts[Kst(ins->b)]);
+            _copy_value(&vs->reg.regs[ins->a], &vs->k.consts[Kst(ins->u.bx)]);
         } break;
 
         case OP_LOADBOOL: {
             Value src;
             src.t = VT_BOOL;
-            src.u.n = ins->b != 0;
+            src.u.n = ins->u.bc.b != 0;
             _copy_value(&vs->reg.regs[ins->a], &src);
-            if (ins->c) {
+            if (ins->u.bc.c) {
                 ++vs->ins.ip;
             }
         } break;
@@ -192,7 +234,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_LOADNIL: {
             Value src;
             src.t = VT_NIL;
-            for (int i = ins->a; i <= ins->b; ++i) {
+            for (int i = ins->a; i <= ins->u.bc.b; ++i) {
                 _copy_value(&vs->reg.regs[i], &src);
             }
         } break;
@@ -200,7 +242,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_GETUPVAL: {NOT_IMP;} break;
 
         case OP_GETGLOBAL: {
-            const Value *k = &vs->k.consts[Kst(ins->b)];
+            const Value *k = &vs->k.consts[Kst(ins->u.bx)];
             if (k->t != VT_STRING) {
                 error("string expected by GETGLOBAL, got %d", k->t);
             }
@@ -220,10 +262,10 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_GETTABLE: {NOT_IMP;} break;
 
         case OP_SETGLOBAL: {
-            int idx = Kst(ins->b);
+            int idx = Kst(ins->u.bx);
             const Value *k = &vs->k.consts[idx];
             if (k->t != VT_STRING) {
-                error("string expected by SETGLOBAL, got %d idx %d(%d)", k->t, idx, ins->b);
+                error("string expected by SETGLOBAL, got %d idx %d(%d)", k->t, idx, ins->u.bx);
             }
             
             const Value *a = &vs->reg.regs[ins->a];
@@ -238,7 +280,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_NEWTABLE: {
             Value v;
             v.t = VT_TABLE;
-            v.u.lt = ltable_new(ins->b);    /* TODO: param `c' not used */
+            v.u.lt = ltable_new(ins->u.bc.b);    /* TODO: param `c' not used */
             _copy_value(&vs->reg.regs[ins->a], &v);
         } break;
 
@@ -250,8 +292,8 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_DIV:
         case OP_MOD:
         case OP_POW: {
-            const Value *b = RK(vs, ins->b);
-            const Value *c = RK(vs, ins->c);
+            const Value *b = RK(vs, ins->u.bc.b);
+            const Value *c = RK(vs, ins->u.bc.c);
             double bf = _get_value_float(b);
             double cf = _get_value_float(c);
             double ca = 0.0;
@@ -291,7 +333,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_UNM: {
             Value v;
             v.t = VT_INVALID;
-            _copy_value(&v, &vs->reg.regs[ins->b]);
+            _copy_value(&v, &vs->reg.regs[ins->u.bc.b]);
             if (v.t == VT_INT) {
                 v.u.n = -v.u.n;
             } else if (v.t == VT_FLOAT) {
@@ -305,7 +347,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_NOT: {
             Value v;
             v.t = VT_BOOL;
-            const Value *b = &vs->reg.regs[ins->b];
+            const Value *b = &vs->reg.regs[ins->u.bc.b];
             switch (b->t) {
                 case VT_BOOL: {v.u.n = b->u.n == 0;} break;
                 case VT_NIL: {v.u.n = 1;} break;
@@ -318,14 +360,14 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
         case OP_CONCAT: {NOT_IMP;} break;
 
         case OP_JMP: {
-            vs->ins.ip += ins->b;
+            vs->ins.ip += ins->u.bx;
         } break;
 
         case OP_EQ:
         case OP_LT:
         case OP_LE: {
-            const Value *b = RK(vs, ins->b);
-            const Value *c = RK(vs, ins->c);
+            const Value *b = RK(vs, ins->u.bc.b);
+            const Value *c = RK(vs, ins->u.bc.c);
             float bf = _get_value_float(b);
             float cf = _get_value_float(c);
             int result = 0;
@@ -344,14 +386,14 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             /* if not (R(A) <=> C) then pc++ */
             /* TODO: what does the `<=>' mean? I just consider it to `=='*/
             int a = (int)_get_value_float(&vs->reg.regs[ins->a]);
-            if (a != ins->c) {++vs->ins.ip;}
+            if (a != ins->u.bc.c) {++vs->ins.ip;}
         } break;
 
         case OP_TESTSET: {
             /* TODO: as OP_TEST, confusing `<=>' */
-            int b = (int)_get_value_float(&vs->reg.regs[ins->b]);
-            if (b == ins->c) {
-                _copy_value(&vs->reg.regs[ins->a], &vs->reg.regs[ins->b]);
+            int b = (int)_get_value_float(&vs->reg.regs[ins->u.bc.b]);
+            if (b == ins->u.bc.c) {
+                _copy_value(&vs->reg.regs[ins->a], &vs->reg.regs[ins->u.bc.b]);
             } else {
                 ++vs->ins.ip;
             }
@@ -371,7 +413,7 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
 
             float a1f = _get_value_float(&vs->reg.regs[ins->a + 1]);
             if (v.u.f <= a1f) {
-                vs->ins.ip += ins->b;
+                vs->ins.ip += ins->u.bx;
                 _copy_value(&vs->reg.regs[ins->a + 3], &v);
             }
         } break;
@@ -383,14 +425,14 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             v.t = VT_FLOAT;
             v.u.f = af - a2f;
             _copy_value(&vs->reg.regs[ins->a], &v);
-            vs->ins.ip += ins->b;
+            vs->ins.ip += ins->u.bx;
         } break;
 
         case OP_TFORLOOP: {NOT_IMP;} break;
 
         case OP_SETLIST: {
             /* TODO: check R[a] ltale type */
-            for (int i = 1; i <= ins->b; ++i) {
+            for (int i = 1; i <= ins->u.bc.b; ++i) {
                 ltable_setarray(vs->reg.regs[ins->a].u.lt, i - 1, &vs->reg.regs[ins->a + i]);
             }
         } break;

@@ -378,8 +378,8 @@ static void _parse_const(A_State *as) {
 
 static void _parse_instr(A_State *as) {
     A_OpCode oc = as->curtok.u.n;
-
     const A_OpMode *om = &A_OpModes[oc];
+
     int a, b, c;
     a = b = c = 0;
     if (om->a != OpArgN) {
@@ -407,9 +407,18 @@ static void _parse_instr(A_State *as) {
 
     A_Instr *ins = NEW(A_Instr);
     ins->t = oc;
-    ins->a = a;
-    ins->b = b;
-    ins->c = c;
+    ins->a = CAST(char, a);
+    switch (om->m) {
+        case iABC: {
+            ins->u.bc.b = CAST(short, b);
+            ins->u.bc.c = CAST(short, c);
+        } break;
+
+        case iABx:
+        case iAsBx: {
+            ins->u.bx = b;
+        } break;
+    }
     list_pushback(as->instrs, ins);
 }
 
@@ -435,22 +444,6 @@ void A_parse(A_State *as) {
     }
 }
 
-static int _instr_num(const A_Instr *instr) {
-    const A_OpMode *om = &A_OpModes[instr->t];
-    switch (om->m) {
-        case iABC: {
-            return (instr->t << A_POS_OP) + (instr->a << A_POS_A) + 
-                (instr->b << A_POS_B) + (instr->c << A_POS_C);
-        }
-
-        case iABx: 
-        case iAsBx: {
-            return (instr->t << A_POS_OP) + (instr->a << A_POS_A) + (instr->b << A_POS_BX);
-        }
-    }
-    return 0;
-}
-
 /*==================================================
 HEADER:
     "LUNA" (4 bytes)
@@ -469,7 +462,8 @@ CONSTS:
 INSTRUCTIONS:
     count (4 bytes)
     {
-        data (4 bytes)
+        opcode (1 byte)
+        args (a: 1 byte; b: 2 bytes; c: 2 bytes; bx 4 bytes)
     }
 ==================================================*/
 void A_createbin(const A_State *as, const char *outfile) { 
@@ -511,8 +505,28 @@ void A_createbin(const A_State *as, const char *outfile) {
     fwrite(&as->instrs->count, 4, 1, f);
     for (lnode *n = as->instrs->head; n != NULL; n = n->next) {
         A_Instr *instr = CAST(A_Instr*, n->data);
-        int in = _instr_num(instr);
-        fwrite(&in, 4, 1, f);
+        const A_OpMode *om = &A_OpModes[instr->t];
+        fwrite(&instr->t, 1, 1, f);
+        if (om->a != OpArgN) {
+            fwrite(&instr->a, 1, 1, f);
+        }
+        switch (om->m) {
+            case iABC: {
+                if (om->b != OpArgN) {
+                    fwrite(&instr->u.bc.b, 2, 1, f);
+                }
+                if (om->c != OpArgN) {
+                    fwrite(&instr->u.bc.c, 2, 1, f);
+                }
+            } break;
+
+            case iABx:
+            case iAsBx: {
+                if (om->b != OpArgN) {
+                    fwrite(&instr->u.bx, 4, 1, f);
+                }
+            } break;
+        }
     }
 
     fclose(f); f = NULL;

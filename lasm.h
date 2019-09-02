@@ -7,36 +7,7 @@
 #define A_VER_MAJOR 5
 #define A_VER_MINOR 1
 
-/*===========================================================================
-  We assume that instructions are unsigned numbers.
-  All instructions have an opcode in the first 6 bits.
-  Instructions can have the following fields:
-	`A' : 8 bits
-	`B' : 9 bits
-	`C' : 9 bits
-	`Bx' : 18 bits (`B' and `C' together)
-	`sBx' : signed Bx
-
-  A signed argument is represented in excess K; that is, the number
-  value is the unsigned value minus K. K is exactly the maximum value
-  for that argument (so that -max is represented by 0, and +max is
-  represented by 2*max), which is half the maximum for the corresponding
-  unsigned argument.
-===========================================================================*/
-
 typedef enum {iABC, iABx, iAsBx} OpMode;   /* basic instruction format */
-
-#define A_SIZE_OP 6
-#define A_SIZE_A 8
-#define A_SIZE_B 9
-#define A_SIZE_C 9
-#define A_SIZE_BX (A_SIZE_B + A_SIZE_C)
-
-#define A_POS_OP 0
-#define A_POS_A (A_POS_OP + A_SIZE_OP)
-#define A_POS_B (A_POS_A + A_SIZE_A)
-#define A_POS_C (A_POS_B + A_SIZE_B)
-#define A_POS_BX A_POS_B
 
 typedef enum {
   OpArgN,  /* argument is not used */
@@ -54,36 +25,6 @@ typedef struct {
 
 extern A_OpMode A_OpModes[];
 extern const char *const A_opnames[];
-
-/*
-** Macros to operate RK indices
-*/
-
-/* this bit 1 means constant (0 means register) */
-#define BITRK		(1 << (A_SIZE_B - 1))
-
-/* test whether value is a constant */
-#define ISK(x)		((x) & BITRK)
-
-/* gets the index of the constant */
-#define INDEXK(r)	((int)(r) & ~BITRK)
-
-#define MAXINDEXRK	(BITRK - 1)
-
-/* code a constant index as a RK value */
-#define RKASK(x)	((x) | BITRK)
-
-/* I defined */
-#define Kst(x) (-x - 1)
-
-/* creates a mask with `n' 1 bits at position `p' */
-#define MASK1(n, p) ((~((~(int)0) << n)) << p)
-
-#define GET_OP(n) (n & MASK1(A_SIZE_OP, A_POS_OP))
-#define GET_A(n) ((n & MASK1(A_SIZE_A, A_POS_A)) >> A_POS_A)
-#define GET_B(n) ((n & MASK1(A_SIZE_B, A_POS_B)) >> A_POS_B)
-#define GET_C(n) ((n & MASK1(A_SIZE_C, A_POS_C)) >> A_POS_C)
-#define GET_Bx(n) ((n & MASK1(A_SIZE_BX, A_POS_BX)) >> A_POS_BX)
 
 /*
 ** R(x) - register
@@ -175,9 +116,11 @@ typedef struct {
 
 typedef struct {
     A_OpCode t;
-    int a;
-    int b;
-    int c;
+    short a;
+    union {
+        struct {short b; short c;} bc;
+        int bx;
+    } u;
 } A_Instr;
 
 typedef struct {
