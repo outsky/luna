@@ -25,3 +25,7 @@ void ltable_settable(ltable *lt, const char *key, const Value *v) {
 Value* ltable_gettable(ltable *lt, const char *key) {
     return CAST(Value*, htable_find(lt->hash, key));
 }
+
+int ltable_len(const ltable *lt) {
+    return lt->arraysize;
+}

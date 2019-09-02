@@ -387,7 +387,16 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             _copy_value(&vs->reg.regs[ins->a], &v);
         } break;
 
-        case OP_LEN: {NOT_IMP;} break;
+        case OP_LEN: {
+            const Value *b = &vs->reg.regs[ins->u.bc.b];
+            /* TODO: only support table? */
+            int len = ltable_len(b->u.lt);
+            Value v;
+            v.t = VT_INT;
+            v.u.n = len;
+            _copy_value(&vs->reg.regs[ins->a], &v);
+        } break;
+
         case OP_CONCAT: {NOT_IMP;} break;
 
         case OP_JMP: {
