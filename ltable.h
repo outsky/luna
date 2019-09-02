@@ -13,5 +13,6 @@ typedef struct ltable {
 ltable* ltable_new(int arraysize);
 void ltable_setarray(ltable *lt, int idx, const Value *v);
 void ltable_settable(ltable *lt, const char *key, const Value *v);
+Value* ltable_gettable(ltable *lt, const char *key);
 
 #endif

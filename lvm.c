@@ -259,7 +259,21 @@ static void _exec_ins(V_State *vs, const A_Instr *ins) {
             }
         } break;
 
-        case OP_GETTABLE: {NOT_IMP;} break;
+        case OP_GETTABLE: {
+            Value *a = &vs->reg.regs[ins->a];
+            const Value *b = &vs->reg.regs[ins->u.bc.b];
+            /* TODO: check b table */
+            const Value *c = RK(vs, ins->u.bc.c);
+            /* TODO: check c string */
+            const Value *v = ltable_gettable(b->u.lt, c->u.s);
+            if (v == NULL) {
+                Value nil;
+                nil.t = VT_NIL;
+                _copy_value(a, &nil);
+            } else {
+                _copy_value(a, v);
+            }
+        } break;
 
         case OP_SETGLOBAL: {
             int idx = Kst(ins->u.bx);

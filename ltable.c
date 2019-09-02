@@ -21,3 +21,7 @@ void ltable_settable(ltable *lt, const char *key, const Value *v) {
     _copy_value(vcopy, v);
     htable_add(lt->hash, key, vcopy);
 }
+
+Value* ltable_gettable(ltable *lt, const char *key) {
+    return CAST(Value*, htable_find(lt->hash, key));
+}
