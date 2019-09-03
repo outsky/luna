@@ -33,7 +33,7 @@ static void assemble_asm(const char *filename) {
 }
 
 static void vm_bin(const char *filename) {
-    V_State *vs = V_newstate(filename);
+    V_State *vs = V_newstate(1024); /* TODO: any better value? */
     V_load(vs, filename);
     V_run(vs);
     V_freestate(vs); vs = NULL;

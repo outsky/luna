@@ -16,7 +16,7 @@ typedef struct {
 
 typedef struct {
     char name[MAX_NAME_LEN];
-    V_ValueStream reg;
+    int regcount;
     V_ValueStream k;
     V_InstrStream ins;
 } V_Func;
@@ -24,6 +24,12 @@ typedef struct {
 typedef struct {
     int fnidx;
 } V_Closure;
+
+typedef struct {
+    int size;
+    int top;
+    Value *values;
+} V_Stack;
 
 typedef struct {
     int major;
@@ -34,9 +40,11 @@ typedef struct {
     list *funcs;    /* main function always at head */
     int curfunc;    /* 0: main */
     int ip;
+
+    V_Stack stk;
 } V_State;
 
-V_State* V_newstate();
+V_State* V_newstate(int stacksize);
 void V_freestate(V_State *vs);
 
 void V_load(V_State *vs, const char *binfile);
