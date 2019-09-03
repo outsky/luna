@@ -105,6 +105,7 @@ A_State* A_newstate(const char *srcfile) {
     as->srcfile = srcfile;
     as->src = load_file(srcfile);
 
+    as->regcount = 2;   /* default */
     as->consts = list_new();
     as->instrs = list_new();
 
@@ -269,7 +270,7 @@ A_TokenType A_nexttok(A_State *as) {
 
                     char *tmp = strndup(as->src + begin, as->curidx - begin);
                     if (strcmp(tmp, "K") == 0) {free(tmp); as->curtok.t = A_TT_CONST; return as->curtok.t;}
-                    if (strcmp(tmp, "REGCOUNT") == 0) {free(tmp); as->curtok.t = A_TT_REGCOUNT; return as->curtok.t;}
+                    if (strcmp(tmp, "R") == 0) {free(tmp); as->curtok.t = A_TT_REGCOUNT; return as->curtok.t;}
 
                     int oc = _getopcode(tmp);
                     FREE(tmp);
@@ -318,7 +319,7 @@ void A_ptok(const A_Token *tok) {
             printf("<K> ");
         } break;
         case A_TT_REGCOUNT: {
-            printf("<REGCOUNT> ");
+            printf("<R> ");
         } break;
         case A_TT_INSTR: {
             printf("<I:%s> ", A_opnames[tok->u.n]);
