@@ -368,9 +368,14 @@ static const char *_toknames[] = {
     "FLOAT",
     "STRING",
     "COMMA",     /* , */
+    "{",
+    "}",
     "NEWLINE",
     "CONST",
+    "REGCOUNT",
+    "FUNC",
     "INSTR",     /* instruction */
+    "IDENT",
     "EOT",
 };
 
