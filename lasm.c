@@ -4,6 +4,13 @@
 
 #define A_FATAL(...) snapshot(as->src, as->curidx, as->curline); error(__VA_ARGS__)
 
+#define expect(tt) do {\
+    if (A_nexttok(as) != tt) {\
+        A_FATAL("`%s' expected, got `%s'", _toknames[tt], _toknames[as->curtok.t]);\
+    }\
+} while (0)
+
+
 A_OpMode A_OpModes[] = {
 /*     A        B       C     mode		   opcode	*/
     {OpArgR, OpArgR, OpArgN, iABC},     /* OP_MOVE */
@@ -100,14 +107,23 @@ enum A_LexState {
     A_LS_IDENT,
 };
 
+static void _add_func(A_State *as, const char *name) {
+    A_Func *f = NEW(A_Func);
+    strncpy(f->name, name, MAX_NAME_LEN);
+    f->regcount = 2;    /* default */
+    f->consts = list_new();
+    f->instrs = list_new();
+
+    list_pushback(as->funcs, f);
+    as->curfunc = as->funcs->count;
+}
+
 A_State* A_newstate(const char *srcfile) {
     A_State *as = NEW(A_State);
     as->srcfile = srcfile;
     as->src = load_file(srcfile);
 
-    as->regcount = 2;   /* default */
-    as->consts = list_new();
-    as->instrs = list_new();
+    as->funcs = list_new();
 
     return as;
 }
@@ -182,8 +198,10 @@ A_TokenType A_nexttok(A_State *as) {
                     break;
                 }
 
-                if (c == ',') {as->curtok.t = A_TT_COMMA; return A_TT_COMMA;}
-                if (c == '\n') {as->curtok.t = A_TT_NEWLINE; ++as->curline; return A_TT_NEWLINE;}
+                if (c == ',') {as->curtok.t = A_TT_COMMA; return as->curtok.t;}
+                if (c == '\n') {as->curtok.t = A_TT_NEWLINE; ++as->curline; return as->curtok.t;}
+                if (c == '{') {as->curtok.t = A_TT_OPEN_BRACE; return as->curtok.t;}
+                if (c == '}') {as->curtok.t = A_TT_CLOSE_BRACE; return as->curtok.t;}
 
                 A_FATAL("invalid char `%c'", c);
             } break;
@@ -269,17 +287,21 @@ A_TokenType A_nexttok(A_State *as) {
                     _freetok(&as->curtok);
 
                     char *tmp = strndup(as->src + begin, as->curidx - begin);
-                    if (strcmp(tmp, "K") == 0) {free(tmp); as->curtok.t = A_TT_CONST; return as->curtok.t;}
-                    if (strcmp(tmp, "R") == 0) {free(tmp); as->curtok.t = A_TT_REGCOUNT; return as->curtok.t;}
+                    if (strcmp(tmp, "K") == 0) {FREE(tmp); as->curtok.t = A_TT_CONST; return as->curtok.t;}
+                    if (strcmp(tmp, "R") == 0) {FREE(tmp); as->curtok.t = A_TT_REGCOUNT; return as->curtok.t;}
+                    if (strcmp(tmp, "FUNC") == 0) {FREE(tmp); as->curtok.t = A_TT_FUNC; return as->curtok.t;}
 
                     int oc = _getopcode(tmp);
-                    FREE(tmp);
                     if (oc >= 0) {
+                        FREE(tmp);
                         as->curtok.t = A_TT_INSTR;
                         as->curtok.u.n = oc;
                         return as->curtok.t;
                     }
-                    A_FATAL("unexpected ident");
+
+                    as->curtok.t = A_TT_IDENT;
+                    as->curtok.u.s = tmp;
+                    return as->curtok.t;
                 }
             } break;
 
@@ -336,6 +358,7 @@ void A_ptok(const A_Token *tok) {
 static void _resetstate(A_State *as) {
     as->curline = 1;
     as->curidx = 0;
+    as->curfunc = 0;
     _freetok(&as->curtok);
 }
 
@@ -351,11 +374,19 @@ static const char *_toknames[] = {
     "EOT",
 };
 
-#define expect(tt) do {\
-    if (A_nexttok(as) != tt) {\
-        A_FATAL("`%s' expected, got `%s'", _toknames[tt], _toknames[as->curtok.t]);\
-    }\
-} while (0)
+static A_Func* _get_curfunc(const A_State *as) {
+    if (as->curfunc == 0) {
+        A_FATAL("not in function scope");
+    }
+    if (as->curfunc > as->funcs->count) {
+        A_FATAL("function idx overflow: %d of %d", as->curfunc, as->funcs->count);
+    }
+    lnode *n = as->funcs->head;
+    for (int i = 0; i < as->curfunc - 1; ++i) {
+        n = n->next;
+    }
+    return CAST(A_Func*, n->data);
+}
 
 static void _parse_const(A_State *as) {
     A_TokenType kt = A_nexttok(as);
@@ -373,8 +404,20 @@ static void _parse_const(A_State *as) {
         FREE(k);
         A_FATAL("const can only be int, float and string");
     }
-    list_pushback(as->consts, k);
+
+    A_Func *fn = _get_curfunc(as);
+    list_pushback(fn->consts, k);
+
     expect(A_TT_NEWLINE);
+}
+
+static void _parse_func(A_State *as) {
+    if (as->curfunc != 0) {
+        A_FATAL("nested function is not allowed");
+    }
+    expect(A_TT_IDENT);
+    _add_func(as, as->curtok.u.s);
+    expect(A_TT_OPEN_BRACE);
 }
 
 static void _parse_instr(A_State *as) {
@@ -420,12 +463,17 @@ static void _parse_instr(A_State *as) {
             ins->u.bx = b;
         } break;
     }
-    list_pushback(as->instrs, ins);
+
+    A_Func *fn = _get_curfunc(as);
+    list_pushback(fn->instrs, ins);
 }
 
 static void _parse_regcount(A_State *as) {
     expect(A_TT_INT);
-    as->regcount = as->curtok.u.n;
+
+    A_Func *fn = _get_curfunc(as);
+    fn->regcount = as->curtok.u.n;
+
     expect(A_TT_NEWLINE);
 }
 
@@ -435,6 +483,13 @@ void A_parse(A_State *as) {
     for (;;) {
         A_TokenType tt = A_nexttok(as);
         switch (tt) {
+            case A_TT_FUNC: {_parse_func(as);} break;
+            case A_TT_CLOSE_BRACE: {
+                if (as->curfunc == 0) {
+                    A_FATAL("unexpected `}'");
+                }
+                as->curfunc = 0;
+            } break;
             case A_TT_CONST: {_parse_const(as);} break;
             case A_TT_INSTR: {_parse_instr(as);} break;
             case A_TT_REGCOUNT: {_parse_regcount(as);} break;
@@ -450,21 +505,30 @@ HEADER:
     "LUNA" (4 bytes)
     VER_MAJOR (2 bytes)
     VER_MINOR (2 bytes)
-    REGCOUNT (2 bytes)
 
-CONSTS:
+FUNCTIONS:
     count (4 bytes)
     {
-        type (1 byte)
-        [size (4 bytes) only for string]
-        data (4 bytes for number)
-    }
+        NAME:
+            len (1 bytes)
+            data (name len bytes)
 
-INSTRUCTIONS:
-    count (4 bytes)
-    {
-        opcode (1 byte)
-        args (a: 1 byte; b: 2 bytes; c: 2 bytes; bx 4 bytes)
+        REGCOUNT (2 bytes)
+
+        CONSTS:
+            count (4 bytes)
+            {
+                type (1 byte)
+                [size (4 bytes) only for string]
+                data (4 bytes for number)
+            }
+
+        INSTRUCTIONS:
+            count (4 bytes)
+            {
+                opcode (1 byte)
+                args (a: 1 byte; b: 2 bytes; c: 2 bytes; bx 4 bytes)
+            }
     }
 ==================================================*/
 void A_createbin(const A_State *as, const char *outfile) { 
@@ -482,51 +546,67 @@ void A_createbin(const A_State *as, const char *outfile) {
     fwrite(&num, 2, 1, f);
     num = A_VER_MINOR;
     fwrite(&num, 2, 1, f);
-    fwrite(&as->regcount, 2, 1, f);
 
-    /* CONSTS */
-    fwrite(&as->consts->count, 4, 1, f);
-    for (lnode *n = as->consts->head; n != NULL; n = n->next) {
-        Value *k = CAST(Value*, n->data);
-        fwrite(&k->t, 1, 1, f);
-        if (k->t == VT_INT) {
-            fwrite(&k->u.n, 4, 1, f);
-        } else if (k->t == VT_FLOAT) {
-            fwrite(&k->u.f, 4, 1, f);
-        } else if (k->t == VT_STRING) {
-            int len = strlen(k->u.s);
-            fwrite(&len, 4, 1, f);
-            fwrite(k->u.s, 1, len, f);
-        } else {
-            error("unexpected const type: %d", k->t);
+    /* FUNCTIONS */
+    fwrite(&as->funcs->count, 4, 1, f);
+    for (const lnode *n = as->funcs->head; n != NULL; n = n->next) {
+        const A_Func *fn = CAST(const A_Func*, n->data);
+
+        /* NAME */
+        int namelen = strlen(fn->name);
+        if (namelen > MAX_NAME_LEN) {
+            namelen = MAX_NAME_LEN;
         }
-    }
+        fwrite(&namelen, 1, 1, f);
+        fwrite(fn->name, 1, namelen, f);
 
-    /* INSTRUCTIONS */
-    fwrite(&as->instrs->count, 4, 1, f);
-    for (lnode *n = as->instrs->head; n != NULL; n = n->next) {
-        A_Instr *instr = CAST(A_Instr*, n->data);
-        const A_OpMode *om = &A_OpModes[instr->t];
-        fwrite(&instr->t, 1, 1, f);
-        if (om->a != OpArgN) {
-            fwrite(&instr->a, 1, 1, f);
+        /* REGCOUNT */
+        fwrite(&fn->regcount, 2, 1, f);
+
+        /* CONSTS */
+        fwrite(&fn->consts->count, 4, 1, f);
+        for (lnode *n = fn->consts->head; n != NULL; n = n->next) {
+            Value *k = CAST(Value*, n->data);
+            fwrite(&k->t, 1, 1, f);
+            if (k->t == VT_INT) {
+                fwrite(&k->u.n, 4, 1, f);
+            } else if (k->t == VT_FLOAT) {
+                fwrite(&k->u.f, 4, 1, f);
+            } else if (k->t == VT_STRING) {
+                int len = strlen(k->u.s);
+                fwrite(&len, 4, 1, f);
+                fwrite(k->u.s, 1, len, f);
+            } else {
+                error("unexpected const type: %d", k->t);
+            }
         }
-        switch (om->m) {
-            case iABC: {
-                if (om->b != OpArgN) {
-                    fwrite(&instr->u.bc.b, 2, 1, f);
-                }
-                if (om->c != OpArgN) {
-                    fwrite(&instr->u.bc.c, 2, 1, f);
-                }
-            } break;
 
-            case iABx:
-            case iAsBx: {
-                if (om->b != OpArgN) {
-                    fwrite(&instr->u.bx, 4, 1, f);
-                }
-            } break;
+        /* INSTRUCTIONS */
+        fwrite(&fn->instrs->count, 4, 1, f);
+        for (lnode *n = fn->instrs->head; n != NULL; n = n->next) {
+            A_Instr *instr = CAST(A_Instr*, n->data);
+            const A_OpMode *om = &A_OpModes[instr->t];
+            fwrite(&instr->t, 1, 1, f);
+            if (om->a != OpArgN) {
+                fwrite(&instr->a, 1, 1, f);
+            }
+            switch (om->m) {
+                case iABC: {
+                    if (om->b != OpArgN) {
+                        fwrite(&instr->u.bc.b, 2, 1, f);
+                    }
+                    if (om->c != OpArgN) {
+                        fwrite(&instr->u.bc.c, 2, 1, f);
+                    }
+                } break;
+
+                case iABx:
+                case iAsBx: {
+                    if (om->b != OpArgN) {
+                        fwrite(&instr->u.bx, 4, 1, f);
+                    }
+                } break;
+            }
         }
     }
 

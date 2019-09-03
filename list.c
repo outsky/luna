@@ -36,6 +36,17 @@ void list_free(list *l) {
     free(l);
 }
 
+int list_pushfront(list *l, void *data) {
+    lnode *n = _newnode(data);
+    if (l->count == 0) {
+        l->head = l->tail = n;
+    } else {
+        n->next = l->head;
+        l->head = n;
+    }
+    return l->count++;
+}
+
 int list_pushback(list *l, void *data) {
     lnode *n = _newnode(data);
     if (l->count == 0) {

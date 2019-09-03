@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include "luna.h"
 
+#define MAX_NAME_LEN 32
 
 #define CAST(T, v) ((T)(v))
 #define NEW_ARRAY(T, n) CAST(T*, calloc(n, sizeof(T)))

@@ -11,9 +11,15 @@ typedef struct {
 
 typedef struct {
     int count;
-    int ip;
     A_Instr *instrs;
 } V_InstrStream;
+
+typedef struct {
+    char name[MAX_NAME_LEN];
+    V_ValueStream reg;
+    V_ValueStream k;
+    V_InstrStream ins;
+} V_Func;
 
 typedef struct {
     int major;
@@ -21,9 +27,9 @@ typedef struct {
 
     ltable *globals;
 
-    V_ValueStream reg;
-    V_ValueStream k;
-    V_InstrStream ins;
+    list *funcs;    /* main function always at head */
+    int curfunc;    /* 0: main */
+    int ip;
 } V_State;
 
 V_State* V_newstate();

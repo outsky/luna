@@ -97,11 +97,15 @@ typedef enum {
     A_TT_INT,
     A_TT_FLOAT,
     A_TT_STRING,
-    A_TT_COMMA,     /* , */
+    A_TT_COMMA,       /* , */
+    A_TT_OPEN_BRACE,  /* { */
+    A_TT_CLOSE_BRACE, /* } */
     A_TT_NEWLINE,
     A_TT_CONST,
     A_TT_REGCOUNT,  /* count of regs */
+    A_TT_FUNC,
     A_TT_INSTR,     /* instruction */
+    A_TT_IDENT,
     A_TT_EOT,
 } A_TokenType;
 
@@ -124,14 +128,20 @@ typedef struct {
 } A_Instr;
 
 typedef struct {
+    char name[MAX_NAME_LEN];
+    int regcount;
+    list *consts;
+    list *instrs;
+} A_Func;
+
+typedef struct {
     const char *srcfile;
     char *src;
     int curline;
     int curidx;
 
-    int regcount;
-    list *consts;
-    list *instrs;
+    list *funcs;
+    int curfunc;    /* 0: in global scope */
 
     A_Token curtok;
 } A_State;
