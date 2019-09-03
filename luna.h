@@ -33,6 +33,7 @@ typedef enum {
     VT_BOOL,
     VT_NIL,
     VT_TABLE,
+    VT_CLOSURE,
 } ValueType;
 
 typedef struct {

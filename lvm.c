@@ -4,6 +4,7 @@
 
 static void _printins(const V_State *vs, const A_Instr *ins);
 static V_Func* _get_curfunc(const V_State *vs);
+static V_Func* _get_func(const V_State *vs, int idx);
 
 V_State* V_newstate() {
     V_State *vs = NEW(V_State);
@@ -145,7 +146,7 @@ static void _resetstate(V_State *vs) {
     vs->ip = 0;
 }
 
-static void _pvalue(const Value *v) {
+static void _pvalue(const V_State *vs, const Value *v) {
     switch (v->t) {
         case VT_INT: {printf("%d\n", v->u.n);} break;
         case VT_FLOAT: {printf("%lf\n", v->u.f);} break;
@@ -161,6 +162,11 @@ static void _pvalue(const Value *v) {
             }
             printf("table(%d, %d):%p\n", lt->arraysize, hashcount, lt);
         } break;
+        case VT_CLOSURE: {
+            const V_Closure *c = v->u.o;
+            const V_Func *fn = _get_func(vs, c->fnidx);
+            printf("closure(%d):%s\n", c->fnidx, fn->name);
+        } break;
         default: {printf("?(%d)\n", v->t);} break;
     }
 }
@@ -169,25 +175,18 @@ static void _pstate(const V_State *vs) {
     const V_Func *fn = _get_curfunc(vs);
 
     printf("{\n");
-    printf("  IP: %d\n", vs->ip);
+    printf("  %s(%d) IP: %d\n", fn->name, vs->curfunc, vs->ip);
     printf("  REGISTERS:\n");
     for (int i = 0; i < fn->reg.count; ++i) {
-        const Value *r = &fn->reg.values[i];
         printf("    %d.\t", i);
-        switch (r->t) {
-            case VT_INT: {printf("%d\n", r->u.n);} break;
-            case VT_FLOAT: {printf("%lf\n", r->u.f);} break;
-            case VT_STRING: {printf("%s\n", r->u.s);} break;
-            case VT_BOOL: {printf("%s\n", r->u.n == 0 ? "false" : "true");} break;
-            case VT_NIL: {printf("nil\n");} break;
-            default: {printf("?\n");} break;
-        }
+        const Value *v = &fn->reg.values[i];
+        _pvalue(vs, v);
     }
     printf("  GLOBALS:\n");
     for (int i = 0; i < vs->globals->arraysize; ++i) {
         const Value *v = &vs->globals->array[i];
         printf("    [%d]\t", i);
-        _pvalue(v);
+        _pvalue(vs, v);
     }
     for (int i = 0; i < vs->globals->hash->size; ++i) {
         const list *l = vs->globals->hash->slots[i];
@@ -195,7 +194,7 @@ static void _pstate(const V_State *vs) {
             const hnode *hn = CAST(const hnode*, n->data);
             printf("    [\"%s\"]\t", hn->key);
             const Value *v = CAST(const Value*, hn->value);
-            _pvalue(v);
+            _pvalue(vs, v);
         }
     }
 
@@ -541,6 +540,14 @@ static void _exec_step(V_State *vs) {
         case OP_CLOSE: {NOT_IMP;} break;
 
         case OP_CLOSURE: {
+            V_Closure *c = NEW(V_Closure);
+            c->fnidx = ins->u.bx + 1;   /* skip `main' */
+
+            Value v;
+            v.t = VT_CLOSURE;
+            v.u.o = c;
+
+            _copy_value(&fn->reg.values[ins->a], &v);
         } break;
 
         case OP_VARARG: {NOT_IMP;} break;
@@ -551,16 +558,23 @@ static void _exec_step(V_State *vs) {
 
 }
 
+static V_Func* _get_func(const V_State *vs, int idx) {
+    if (idx < 0 || idx >= vs->funcs->count) {
+        return NULL;
+    }
+    lnode *n = vs->funcs->head;
+    for (int i = 0; i < idx; ++i) {
+        n = n->next;
+    }
+    return CAST(V_Func*, n->data);
+}
+
 static V_Func* _get_curfunc(const V_State *vs) {
     if (vs->curfunc >= vs->funcs->count) {
         error("curfunc overflow: %d of %d", vs->curfunc, vs->funcs->count);
     }
 
-    lnode *n = vs->funcs->head;
-    for (int i = 0; i < vs->curfunc; ++i) {
-        n = n->next;
-    }
-    return CAST(V_Func*, n->data);
+    return _get_func(vs, vs->curfunc);
 }
 
 void V_run(V_State *vs) {
