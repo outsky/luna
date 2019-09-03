@@ -499,7 +499,14 @@ static void _exec_step(V_State *vs) {
             }
         } break;
 
-        case OP_CALL: {NOT_IMP;} break;
+        case OP_CALL: {
+            const Value *a = &fn->reg.values[ins->a];
+            /* TODO: check closure type */
+            V_Closure *c = a->u.o;
+            vs->curfunc = c->fnidx;
+            vs->ip = -1;
+        } break;
+
         case OP_TAILCALL: {NOT_IMP;} break;
         case OP_RETURN: {NOT_IMP;} break;
 
