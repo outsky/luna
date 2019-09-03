@@ -22,6 +22,10 @@ typedef struct {
 } V_Func;
 
 typedef struct {
+    int fnidx;
+} V_Closure;
+
+typedef struct {
     int major;
     int minor;
 

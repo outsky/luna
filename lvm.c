@@ -153,7 +153,7 @@ static void _pvalue(const Value *v) {
         case VT_BOOL: {printf("%s\n", v->u.n == 0 ? "false" : "true");} break;
         case VT_NIL: {printf("nil\n");} break;
         case VT_TABLE: {
-            const ltable *lt = v->u.lt;
+            const ltable *lt = v->u.o;
             int hashcount = 0;
             for (int i = 0; i < lt->hash->size; ++i) {
                 const list *l = lt->hash->slots[i];
@@ -307,7 +307,7 @@ static void _exec_step(V_State *vs) {
             /* TODO: check b table */
             const Value *c = RK(fn, ins->u.bc.c);
             /* TODO: check c string */
-            const Value *v = ltable_gettable(b->u.lt, c->u.s);
+            const Value *v = ltable_gettable(b->u.o, c->u.s);
             if (v == NULL) {
                 Value nil;
                 nil.t = VT_NIL;
@@ -336,13 +336,13 @@ static void _exec_step(V_State *vs) {
             const Value *b = RK(fn, ins->u.bc.b);
             /* TODO: check b string */
             const Value *c = RK(fn, ins->u.bc.c);
-            ltable_settable(a->u.lt, b->u.s, c);
+            ltable_settable(a->u.o, b->u.s, c);
         } break;
 
         case OP_NEWTABLE: {
             Value v;
             v.t = VT_TABLE;
-            v.u.lt = ltable_new(ins->u.bc.b);    /* TODO: param `c' not used */
+            v.u.o = ltable_new(ins->u.bc.b);    /* TODO: param `c' not used */
             _copy_value(&fn->reg.values[ins->a], &v);
         } break;
 
@@ -353,7 +353,7 @@ static void _exec_step(V_State *vs) {
             _copy_value(&fn->reg.values[ins->a + 1], b);
 
             const Value *c = RK(fn, ins->u.bc.c);
-            const Value *v = ltable_gettable(b->u.lt, c->u.s);
+            const Value *v = ltable_gettable(b->u.o, c->u.s);
             _copy_value(&fn->reg.values[ins->a], v);
         } break;
 
@@ -430,7 +430,7 @@ static void _exec_step(V_State *vs) {
         case OP_LEN: {
             const Value *b = &fn->reg.values[ins->u.bc.b];
             /* TODO: only support table? */
-            int len = ltable_len(b->u.lt);
+            int len = ltable_len(b->u.o);
             Value v;
             v.t = VT_INT;
             v.u.n = len;
@@ -534,12 +534,15 @@ static void _exec_step(V_State *vs) {
         case OP_SETLIST: {
             /* TODO: check R[a] ltale type */
             for (int i = 1; i <= ins->u.bc.b; ++i) {
-                ltable_setarray(fn->reg.values[ins->a].u.lt, i - 1, &fn->reg.values[ins->a + i]);
+                ltable_setarray(fn->reg.values[ins->a].u.o, i - 1, &fn->reg.values[ins->a + i]);
             }
         } break;
 
         case OP_CLOSE: {NOT_IMP;} break;
-        case OP_CLOSURE: {NOT_IMP;} break;
+
+        case OP_CLOSURE: {
+        } break;
+
         case OP_VARARG: {NOT_IMP;} break;
         default: {
             error("unknown instruction type: %d", ins->t);

@@ -68,7 +68,9 @@ void _copy_value(Value *dest, const Value *src) {
         case VT_INT: {dest->u.n = src->u.n;} break;
         case VT_FLOAT: {dest->u.f = src->u.f;} break;
         case VT_STRING: {dest->u.s = strdup(src->u.s);} break;
-        case VT_TABLE: {dest->u.lt = src->u.lt;} break;
+
+        case VT_TABLE: {dest->u.o = src->u.o;} break;
+
         default: {/* nothing to copy */} break;
     }
 }

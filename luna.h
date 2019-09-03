@@ -25,7 +25,6 @@ void errorf(const char *where, const char *fmt, ...);
 void snapshot(const char* code, int pos, int line);
 char* load_file(const char *filename);
 
-struct ltable;
 typedef enum {
     VT_INVALID,
     VT_INT,
@@ -42,7 +41,7 @@ typedef struct {
         int n;
         double f;
         char *s;
-        struct ltable *lt;
+        void *o;
     } u;
 } Value;
 
