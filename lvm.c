@@ -7,6 +7,12 @@
 #define V_UNPACK_A(n) (CAST(unsigned int, n) << 16 >> 24)
 #define V_UNPACK_C(n) (CAST(unsigned int, n) >> 16)
 
+#define V_CHECKTYPE(v, vt) do {\
+    if (v->t != vt) {\
+        error("expect type %d, got %d\n", vt, v->t);\
+    }\
+} while (0)
+
 static void _printins(const V_State *vs, const A_Instr *ins);
 static V_Func* _get_curfunc(const V_State *vs);
 static V_Func* _get_func(const V_State *vs, int idx);
@@ -340,9 +346,9 @@ static void _exec_step(V_State *vs) {
         case OP_GETTABLE: {
             Value *a = _get_reg(vs, ins->a);
             const Value *b = _get_reg(vs, ins->u.bc.b);
-            /* TODO: check b table */
+            V_CHECKTYPE(b, VT_TABLE);
             const Value *c = RK(vs, fn, ins->u.bc.c);
-            /* TODO: check c string */
+            V_CHECKTYPE(c, VT_STRING);
             const Value *v = ltable_gettable(b->u.o, c->u.s);
             if (v == NULL) {
                 Value nil;
@@ -368,9 +374,9 @@ static void _exec_step(V_State *vs) {
 
         case OP_SETTABLE: {
             Value *a = _get_reg(vs, ins->a);
-            /* TODO: check a table */
+            V_CHECKTYPE(a, VT_TABLE);
             const Value *b = RK(vs, fn, ins->u.bc.b);
-            /* TODO: check b string */
+            V_CHECKTYPE(b, VT_TABLE);
             const Value *c = RK(vs, fn, ins->u.bc.c);
             ltable_settable(a->u.o, b->u.s, c);
         } break;
@@ -384,7 +390,7 @@ static void _exec_step(V_State *vs) {
 
         case OP_SELF: {
             const Value *b = _get_reg(vs, ins->u.bc.b);
-            /* TODO: check b table */
+            V_CHECKTYPE(b, VT_TABLE);
 
             _copy_value(_get_reg(vs, ins->a + 1), b);
 
@@ -464,6 +470,7 @@ static void _exec_step(V_State *vs) {
 
         case OP_LEN: {
             const Value *b = _get_reg(vs, ins->u.bc.b);
+            V_CHECKTYPE(b, VT_TABLE);
             /* TODO: only support table? */
             int len = ltable_len(b->u.o);
             Value v;
@@ -478,7 +485,7 @@ static void _exec_step(V_State *vs) {
             char *buff = NEW_ARRAY(char, maxlen);
             for (int i = ins->u.bc.b; i <= ins->u.bc.c; ++i) {
                 const Value *v = _get_reg(vs, i);
-                /* TODO: check string type */
+                V_CHECKTYPE(v, VT_STRING);
                 const char *s = v->u.s;
                 int len = strlen(s);
                 if (curlen + len >= maxlen) {
@@ -537,8 +544,8 @@ static void _exec_step(V_State *vs) {
 
         case OP_CALL: {
             const Value *a = _get_reg(vs, ins->a);
+            V_CHECKTYPE(a, VT_CLOSURE);
             V_Closure *cl = a->u.o;
-            /* TODO: check closure type */
 
             /* function frame */
             _push_func(vs, cl->fnidx, ins->a, ins->u.bc.c, vs->ip + 1);
@@ -568,15 +575,15 @@ static void _exec_step(V_State *vs) {
 
             /* fid|a|c */
             const Value *fid = _get_stack(vs, -1);
+            V_CHECKTYPE(fid, VT_INT);
             int a = V_UNPACK_A(fid->u.n);
             int c = V_UNPACK_C(fid->u.n);
 
             const Value *ret = _get_stack(vs, -1 - fn->regcount - 1);
-            /* TODO: check int type */
+            V_CHECKTYPE(ret, VT_INT);
             vs->ip = ret->u.n - 1;
             _pop(vs, 1 + fn->regcount + 1); /* fid|a|c, regs, ret */
             vs->curframe = vs->stk.top - 1;
-            /* TODO: check int type */
             for (int i = a; i <= a + c - 2; ++i) {
                 int idx = ins->a + i - a;
                 if (idx > ins->a + ins->u.bc.b - 2) {
@@ -618,9 +625,10 @@ static void _exec_step(V_State *vs) {
         case OP_TFORLOOP: {NOT_IMP;} break;
 
         case OP_SETLIST: {
-            /* TODO: check R[a] ltale type */
             for (int i = 1; i <= ins->u.bc.b; ++i) {
-                ltable_setarray(_get_reg(vs, ins->a)->u.o, i - 1, _get_reg(vs, ins->a + i));
+                Value *ra = _get_reg(vs, ins->a);
+                V_CHECKTYPE(ra, VT_TABLE);
+                ltable_setarray(ra->u.o, i - 1, _get_reg(vs, ins->a + i));
             }
         } break;
 
