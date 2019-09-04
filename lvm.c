@@ -74,45 +74,45 @@ void V_load(V_State *vs, const char *binfile) {
 
     /* HEADER */
     char ident[4];
-    fread(ident, 1, 4, f);
+    FREAD(ident, 1, 4, f);
     if (strncmp(ident, "LUNA", 4) != 0) {
         error("File format not support: `%s'", ident);
     }
-    fread(&vs->major, 2, 1, f);
-    fread(&vs->minor, 2, 1, f);
+    FREAD(&vs->major, 2, 1, f);
+    FREAD(&vs->minor, 2, 1, f);
 
     /* FUNCTIONS */
-    int n = 0;
-    fread(&n, 4, 1, f);
-    for (int i = 0; i < n; ++i) {
+    int fcount = 0;
+    FREAD(&fcount, 4, 1, f);
+    for (int i = 0; i < fcount; ++i) {
         V_Func *fn = NEW(V_Func);
 
         /* NAME */
-        n = 0;
-        fread(&n, 1, 1, f);
-        fread(fn->name, 1, n, f);
+        int n = 0;
+        FREAD(&n, 1, 1, f);
+        FREAD(fn->name, 1, n, f);
 
         /* PARAM */
-        fread(&fn->param, 2, 1, f);
+        FREAD(&fn->param, 2, 1, f);
 
         /* REGCOUNT */
-        fread(&fn->regcount, 2, 1, f);
+        FREAD(&fn->regcount, 2, 1, f);
  
         /* CONSTS */
-        fread(&fn->k.count, 4, 1, f);
+        FREAD(&fn->k.count, 4, 1, f);
         if (fn->k.count > 0) {
             fn->k.values = NEW_ARRAY(Value, fn->k.count);
             for (int i = 0; i < fn->k.count; ++i) {
                 Value *k = &fn->k.values[i];
-                fread(&k->t, 1, 1, f);
+                FREAD(&k->t, 1, 1, f);
                 switch (k->t) {
-                    case VT_INT: {fread(&k->u.n, 4, 1, f);} break;
-                    case VT_FLOAT: {fread(&k->u.f, 4, 1, f);} break;
+                    case VT_INT: {FREAD(&k->u.n, 4, 1, f);} break;
+                    case VT_FLOAT: {FREAD(&k->u.f, 4, 1, f);} break;
                     case VT_STRING: {
                         int len = 0;
-                        fread(&len, 4, 1, f);
+                        FREAD(&len, 4, 1, f);
                         k->u.s = NEW_SIZE(char, len + 1);
-                        fread(k->u.s, 1, len, f);
+                        FREAD(k->u.s, 1, len, f);
                     } break;
                     default: {error("unexpected const value type: %d", k->t);} break;
                 }
@@ -120,30 +120,30 @@ void V_load(V_State *vs, const char *binfile) {
         }
 
         /* INSTRUCTIONS */
-        fread(&fn->ins.count, 4, 1, f);
+        FREAD(&fn->ins.count, 4, 1, f);
         if (fn->ins.count > 0) {
             fn->ins.instrs = NEW_ARRAY(A_Instr, fn->ins.count);
             for (int i = 0; i < fn->ins.count; ++i) {
                 A_Instr *ins = &fn->ins.instrs[i];
-                fread(&ins->t, 1, 1, f);
+                FREAD(&ins->t, 1, 1, f);
                 const A_OpMode *om = &A_OpModes[ins->t];
                 if (om->a != OpArgN) {
-                    fread(&ins->a, 1, 1, f);
+                    FREAD(&ins->a, 1, 1, f);
                 }
                 switch (om->m) {
                     case iABC: {
                         if (om->b != OpArgN) {
-                            fread(&ins->u.bc.b, 2, 1, f);
+                            FREAD(&ins->u.bc.b, 2, 1, f);
                         }
                         if (om->c != OpArgN) {
-                            fread(&ins->u.bc.c, 2, 1, f);
+                            FREAD(&ins->u.bc.c, 2, 1, f);
                         }
                     } break;
 
                     case iABx:
                     case iAsBx: {
                         if (om->b != OpArgN) {
-                            fread(&ins->u.bx, 4, 1, f);
+                            FREAD(&ins->u.bx, 4, 1, f);
                         }
                     } break;
                 }
@@ -157,6 +157,13 @@ void V_load(V_State *vs, const char *binfile) {
         }
     }
 
+    long read = ftell(f);
+    fseek(f, 0, SEEK_END);
+    long total = ftell(f);
+    if (read != total) {
+        fclose(f); f = NULL;
+        error("load file failed: %ld of %ld", read, total);
+    }
     fclose(f); f = NULL;
 
     _show_status(vs);

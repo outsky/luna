@@ -21,6 +21,12 @@
 #define STR(x) STR2(x)
 #define error(...) errorf(__FILE__ ":" STR(__LINE__), __VA_ARGS__)
 
+#define FREAD(p, s, c, f) do {\
+    if (c != fread(p, s, c, f)) {\
+        error("fread failed1: %s", strerror(errno));\
+    }\
+} while (0)
+
 void errorf(const char *where, const char *fmt, ...);
 void snapshot(const char* code, int pos, int line);
 char* load_file(const char *filename);
