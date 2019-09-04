@@ -16,6 +16,7 @@ typedef struct {
 
 typedef struct {
     char name[MAX_NAME_LEN];
+    int param;
     int regcount;
     V_ValueStream k;
     V_InstrStream ins;
@@ -39,6 +40,7 @@ typedef struct {
 
     list *funcs;    /* main function always at head */
     int curfunc;    /* 0: main */
+    int curframe;
     int ip;
 
     V_Stack stk;

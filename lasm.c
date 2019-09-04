@@ -289,6 +289,7 @@ A_TokenType A_nexttok(A_State *as) {
                     char *tmp = strndup(as->src + begin, as->curidx - begin);
                     if (strcmp(tmp, "K") == 0) {FREE(tmp); as->curtok.t = A_TT_CONST; return as->curtok.t;}
                     if (strcmp(tmp, "R") == 0) {FREE(tmp); as->curtok.t = A_TT_REGCOUNT; return as->curtok.t;}
+                    if (strcmp(tmp, "PARAM") == 0) {FREE(tmp); as->curtok.t = A_TT_PARAM; return as->curtok.t;}
                     if (strcmp(tmp, "FUNC") == 0) {FREE(tmp); as->curtok.t = A_TT_FUNC; return as->curtok.t;}
 
                     int oc = _getopcode(tmp);
@@ -473,6 +474,15 @@ static void _parse_instr(A_State *as) {
     list_pushback(fn->instrs, ins);
 }
 
+static void _parse_param(A_State *as) {
+    expect(A_TT_INT);
+
+    A_Func *fn = _get_curfunc(as);
+    fn->param = as->curtok.u.n;
+
+    expect(A_TT_NEWLINE);
+}
+
 static void _parse_regcount(A_State *as) {
     expect(A_TT_INT);
 
@@ -497,6 +507,7 @@ void A_parse(A_State *as) {
             } break;
             case A_TT_CONST: {_parse_const(as);} break;
             case A_TT_INSTR: {_parse_instr(as);} break;
+            case A_TT_PARAM: {_parse_param(as);} break;
             case A_TT_REGCOUNT: {_parse_regcount(as);} break;
             case A_TT_NEWLINE: {} break;
             case A_TT_EOT: {return;}
@@ -518,6 +529,7 @@ FUNCTIONS:
             len (1 bytes)
             data (name len bytes)
 
+        PARAM (2 bytes)
         REGCOUNT (2 bytes)
 
         CONSTS:
@@ -564,6 +576,9 @@ void A_createbin(const A_State *as, const char *outfile) {
         }
         fwrite(&namelen, 1, 1, f);
         fwrite(fn->name, 1, namelen, f);
+
+        /* PARAM */
+        fwrite(&fn->param, 2, 1, f);
 
         /* REGCOUNT */
         fwrite(&fn->regcount, 2, 1, f);

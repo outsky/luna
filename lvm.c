@@ -2,12 +2,18 @@
 #include "lvm.h"
 #include "ltable.h"
 
+#define V_PACK_FID_A_C(fid, a, c) (CAST(unsigned char, fid) + (CAST(unsigned char, a) << 8) + (CAST(unsigned short, c) << 16))
+#define V_UNPACK_FID(n) (CAST(unsigned int, n) << 24 >> 24)
+#define V_UNPACK_A(n) (CAST(unsigned int, n) << 16 >> 24)
+#define V_UNPACK_C(n) (CAST(unsigned int, n) >> 16)
+
 static void _printins(const V_State *vs, const A_Instr *ins);
 static V_Func* _get_curfunc(const V_State *vs);
 static V_Func* _get_func(const V_State *vs, int idx);
 static Value* _get_reg(const V_State *vs, int idx);
-static void _push_func(V_State *vs, int fnidx, int retip);
+static void _push_func(V_State *vs, int fnidx, int a, int c, int retip);
 static void _pop(V_State *vs, int n);
+static void _set_param(V_State *vs, int fnidx, int i, const Value *v);
 
 V_State* V_newstate(int stacksize) {
     V_State *vs = NEW(V_State);
@@ -79,6 +85,9 @@ void V_load(V_State *vs, const char *binfile) {
         n = 0;
         fread(&n, 1, 1, f);
         fread(fn->name, 1, n, f);
+
+        /* PARAM */
+        fread(&fn->param, 2, 1, f);
 
         /* REGCOUNT */
         fread(&fn->regcount, 2, 1, f);
@@ -269,7 +278,7 @@ static Value* _get_reg(const V_State *vs, int idx) {
         error("function is null: %d", vs->curfunc);
     }
     const V_Stack *stk = &vs->stk;
-    return &(stk->values[stk->top - 1 - fn->regcount + idx]);
+    return &(stk->values[vs->curframe - fn->regcount + idx]);
 }
 
 static void _exec_step(V_State *vs) {
@@ -525,12 +534,21 @@ static void _exec_step(V_State *vs) {
 
         case OP_CALL: {
             const Value *a = _get_reg(vs, ins->a);
+            V_Closure *cl = a->u.o;
             /* TODO: check closure type */
-            V_Closure *c = a->u.o;
-            _push_func(vs, c->fnidx, vs->ip + 1);
 
-            vs->curfunc = c->fnidx;
+            /* function frame */
+            _push_func(vs, cl->fnidx, ins->a, ins->u.bc.c, vs->ip + 1);
+
+            /* push params */
+            const V_Func *fn = _get_func(vs, cl->fnidx);
+            for (int i = 0; i < fn->param; ++i) {
+                _set_param(vs, cl->fnidx, i, _get_reg(vs, ins->a + 1 + i));
+            }
+
+            vs->curfunc = cl->fnidx;
             vs->ip = -1;
+            vs->curframe = vs->stk.top - 1;
         } break;
 
         case OP_TAILCALL: {NOT_IMP;} break;
@@ -547,10 +565,10 @@ static void _exec_step(V_State *vs) {
             const Value *ret = _get_stack(vs, -1 - fn->regcount - 1);
             /* TODO: check int type */
             vs->ip = ret->u.n - 1;
-            _pop(vs, 1 + fn->regcount + 1); /* fid, regs, ret */
+            _pop(vs, 1 + fn->regcount + 1); /* fid|a|c, regs, ret */
             const Value *fid = _get_stack(vs, -1);
             /* TODO: check int type */
-            vs->curfunc = fid->u.n;
+            vs->curfunc = V_UNPACK_FID(fid->u.n);
         } break;
 
         case OP_FORLOOP: {
@@ -636,10 +654,16 @@ static void _pop(V_State *vs, int n) {
     vs->stk.top -= n;
 }
 
+static void _set_param(V_State *vs, int fnidx, int i, const Value *v) {
+    const V_Func *fn = _get_func(vs, fnidx);
+    Value *p = _get_stack(vs, -1 - fn->regcount + i);
+    _copy_value(p, v);
+}
+
 /*
-**  push `ret', `regs', `fid'
+**  push `ret', `regs', `fid|A|C'
 */
-static void _push_func(V_State *vs, int fnidx, int retip) {
+static void _push_func(V_State *vs, int fnidx, int a, int c, int retip) {
     /* ret */
     Value v;
     v.t = VT_INT;
@@ -658,13 +682,14 @@ static void _push_func(V_State *vs, int fnidx, int retip) {
 
     /* function index */
     v.t = VT_INT;
-    v.u.n = fnidx;
+    v.u.n = V_PACK_FID_A_C(fnidx, a, c);
     _push(vs, &v);
 }
 
 void V_run(V_State *vs) {
     _resetstate(vs);
-    _push_func(vs, 0, 0);
+    _push_func(vs, 0, 0, 0, 0);
+    vs->curframe = vs->stk.top - 1;
     _pstate(vs);
 
     for (;;) {
