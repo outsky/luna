@@ -26,12 +26,11 @@ void snapshot(const char* code, int pos, int line);
 char* load_file(const char *filename);
 
 typedef enum {
-    VT_INVALID,
+    VT_NIL,
     VT_INT,
     VT_FLOAT,
     VT_STRING,
     VT_BOOL,
-    VT_NIL,
     VT_TABLE,
     VT_CLOSURE,
 } ValueType;

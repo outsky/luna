@@ -266,10 +266,14 @@ static void _printins(const V_State *vs, const A_Instr *ins) {
     printf(">\n");
 }
 
-/* backidx: top first is -1 */
-static Value* _get_stack(const V_State *vs, int backidx) {
+/* idx: relative position from `top'
+**      0: top
+**      1: top + 1
+**     -1: top - 1
+*/
+static Value* _get_stack(const V_State *vs, int idx) {
     const V_Stack *stk = &vs->stk;
-    return &(stk->values[stk->top + backidx]);
+    return &(stk->values[stk->top + idx]);
 }
 
 static Value* _get_reg(const V_State *vs, int idx) {
@@ -435,7 +439,6 @@ static void _exec_step(V_State *vs) {
 
         case OP_UNM: {
             Value v;
-            v.t = VT_INVALID;
             _copy_value(&v, _get_reg(vs, ins->u.bc.b));
             if (v.t == VT_INT) {
                 v.u.n = -v.u.n;
@@ -562,12 +565,28 @@ static void _exec_step(V_State *vs) {
             if (fn == NULL) {
                 error("current function is null: %d", vs->curfunc);
             }
+
+            /* fid|a|c */
+            const Value *fid = _get_stack(vs, -1);
+            int a = V_UNPACK_A(fid->u.n);
+            int c = V_UNPACK_C(fid->u.n);
+
             const Value *ret = _get_stack(vs, -1 - fn->regcount - 1);
             /* TODO: check int type */
             vs->ip = ret->u.n - 1;
             _pop(vs, 1 + fn->regcount + 1); /* fid|a|c, regs, ret */
-            const Value *fid = _get_stack(vs, -1);
+            vs->curframe = vs->stk.top - 1;
             /* TODO: check int type */
+            for (int i = a; i <= a + c - 2; ++i) {
+                int idx = ins->a + i - a;
+                if (idx > ins->a + ins->u.bc.b - 2) {
+                    _copy_value(_get_reg(vs, i), NULL);
+                } else {
+                    _copy_value(_get_reg(vs, i), _get_stack(vs, idx + 1));
+                }
+            }
+
+            fid = _get_stack(vs, -1);
             vs->curfunc = V_UNPACK_FID(fid->u.n);
         } break;
 

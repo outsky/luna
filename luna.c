@@ -63,6 +63,10 @@ void _copy_value(Value *dest, const Value *src) {
     if (dest->t == VT_STRING) {
         FREE(dest->u.s);
     }
+    if (src == NULL) {
+        dest->t = VT_NIL;
+        return;
+    }
     dest->t = src->t;
     switch (src->t) {
         case VT_INT: {dest->u.n = src->u.n;} break;
