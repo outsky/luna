@@ -6,6 +6,7 @@ static void _printins(const V_State *vs, const A_Instr *ins);
 static V_Func* _get_curfunc(const V_State *vs);
 static V_Func* _get_func(const V_State *vs, int idx);
 static Value* _get_reg(const V_State *vs, int idx);
+static void _push_func(V_State *vs, int fnidx, int retip);
 
 V_State* V_newstate(int stacksize) {
     V_State *vs = NEW(V_State);
@@ -515,6 +516,8 @@ static void _exec_step(V_State *vs) {
             const Value *a = _get_reg(vs, ins->a);
             /* TODO: check closure type */
             V_Closure *c = a->u.o;
+            _push_func(vs, c->fnidx, vs->ip + 1);
+
             vs->curfunc = c->fnidx;
             vs->ip = -1;
         } break;
@@ -596,7 +599,22 @@ static V_Func* _get_curfunc(const V_State *vs) {
     return _get_func(vs, vs->curfunc);
 }
 
-static void _push_func(V_State *vs, int fnidx) {
+static void _push(V_State *vs, const Value *v) {
+    _copy_value(&vs->stk.values[vs->stk.top], v);
+    ++vs->stk.top;
+}
+
+/*
+**  push `ret', `regs', `fid'
+*/
+static void _push_func(V_State *vs, int fnidx, int retip) {
+    /* ret */
+    Value v;
+    v.t = VT_INT;
+    v.u.n = retip;
+    _push(vs, &v);
+
+    /* registers */
     const V_Func *fn = _get_curfunc(vs);
     if (fn == NULL) {
         error("function not exists: %d", fnidx);
@@ -605,11 +623,16 @@ static void _push_func(V_State *vs, int fnidx) {
     if (vs->stk.top >= vs->stk.size) {
         error("stack overflow: %d of %d by function %s(%d) adding %d", vs->stk.top, vs->stk.size, fn->name, fnidx, fn->regcount);
     }
+
+    /* function index */
+    v.t = VT_INT;
+    v.u.n = fnidx;
+    _push(vs, &v);
 }
 
 void V_run(V_State *vs) {
     _resetstate(vs);
-    _push_func(vs, 0);
+    _push_func(vs, 0, 0);
     _pstate(vs);
 
     for (;;) {
