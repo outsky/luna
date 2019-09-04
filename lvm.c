@@ -7,6 +7,7 @@ static V_Func* _get_curfunc(const V_State *vs);
 static V_Func* _get_func(const V_State *vs, int idx);
 static Value* _get_reg(const V_State *vs, int idx);
 static void _push_func(V_State *vs, int fnidx, int retip);
+static void _pop(V_State *vs, int n);
 
 V_State* V_newstate(int stacksize) {
     V_State *vs = NEW(V_State);
@@ -180,10 +181,14 @@ static void _pstate(const V_State *vs) {
 
     printf("{\n");
     printf("  %s(%d) IP: %d\n", fn->name, vs->curfunc, vs->ip);
-    printf("  REGISTERS:\n");
-    for (int i = 0; i < fn->regcount; ++i) {
-        printf("    %d.\t", i);
-        const Value *v = _get_reg(vs, i);
+    printf("  STACK:\n");
+    for (int i = vs->stk.top - 1; i >= 0; --i) {
+        if (vs->stk.top - i <= (1 + fn->regcount + 1)) {
+            printf("    *%d.\t", i);
+        } else {
+            printf("    %d.\t", i);
+        }
+        const Value *v = &vs->stk.values[i];
         _pvalue(vs, v);
     }
     printf("  GLOBALS:\n");
@@ -252,13 +257,19 @@ static void _printins(const V_State *vs, const A_Instr *ins) {
     printf(">\n");
 }
 
+/* backidx: top first is -1 */
+static Value* _get_stack(const V_State *vs, int backidx) {
+    const V_Stack *stk = &vs->stk;
+    return &(stk->values[stk->top + backidx]);
+}
+
 static Value* _get_reg(const V_State *vs, int idx) {
     V_Func *fn = _get_curfunc(vs);
     if (fn == NULL) {
         error("function is null: %d", vs->curfunc);
     }
     const V_Stack *stk = &vs->stk;
-    return &(stk->values[stk->top - fn->regcount + idx]);
+    return &(stk->values[stk->top - 1 - fn->regcount + idx]);
 }
 
 static void _exec_step(V_State *vs) {
@@ -523,7 +534,24 @@ static void _exec_step(V_State *vs) {
         } break;
 
         case OP_TAILCALL: {NOT_IMP;} break;
-        case OP_RETURN: {NOT_IMP;} break;
+
+        case OP_RETURN: {
+            if (vs->curfunc == 0) {
+                /* TODO: better idea? */
+                return;
+            }
+            const V_Func *fn = _get_curfunc(vs);
+            if (fn == NULL) {
+                error("current function is null: %d", vs->curfunc);
+            }
+            const Value *ret = _get_stack(vs, -1 - fn->regcount - 1);
+            /* TODO: check int type */
+            vs->ip = ret->u.n - 1;
+            _pop(vs, 1 + fn->regcount + 1); /* fid, regs, ret */
+            const Value *fid = _get_stack(vs, -1);
+            /* TODO: check int type */
+            vs->curfunc = fid->u.n;
+        } break;
 
         case OP_FORLOOP: {
             float af = _get_value_float(_get_reg(vs, ins->a));
@@ -602,6 +630,10 @@ static V_Func* _get_curfunc(const V_State *vs) {
 static void _push(V_State *vs, const Value *v) {
     _copy_value(&vs->stk.values[vs->stk.top], v);
     ++vs->stk.top;
+}
+
+static void _pop(V_State *vs, int n) {
+    vs->stk.top -= n;
 }
 
 /*
