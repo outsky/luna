@@ -376,7 +376,7 @@ static void _exec_step(V_State *vs) {
             Value *a = _get_reg(vs, ins->a);
             V_CHECKTYPE(a, VT_TABLE);
             const Value *b = RK(vs, fn, ins->u.bc.b);
-            V_CHECKTYPE(b, VT_TABLE);
+            V_CHECKTYPE(b, VT_STRING);
             const Value *c = RK(vs, fn, ins->u.bc.c);
             ltable_settable(a->u.o, b->u.s, c);
         } break;
