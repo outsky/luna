@@ -383,7 +383,11 @@ static void _exec_step(V_State *vs) {
             ltable_settable(vs->globals, k->u.s, a);
         } break;
 
-        case OP_SETUPVAL: {NOT_IMP;} break;
+        case OP_SETUPVAL: {
+            Value *v = &vs->cl->uv.values[ins->u.bc.b];
+            V_CHECKTYPE(v, VT_VALUEP);
+            _copy_value(v->u.o, _get_reg(vs, ins->a));
+        } break;
 
         case OP_SETTABLE: {
             Value *a = _get_reg(vs, ins->a);
