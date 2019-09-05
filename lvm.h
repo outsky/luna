@@ -23,7 +23,13 @@ typedef struct {
 } V_Func;
 
 typedef struct {
+    int count;
+    Value *values;
+} V_UpValue;
+
+typedef struct {
     int fnidx;
+    V_UpValue uv;
 } V_Closure;
 
 typedef struct {
@@ -43,6 +49,7 @@ typedef struct {
     int curframe;
     int ip;
 
+    V_Closure *cl;
     V_Stack stk;
 } V_State;
 

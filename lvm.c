@@ -330,7 +330,13 @@ static void _exec_step(V_State *vs) {
             }
         } break;
 
-        case OP_GETUPVAL: {NOT_IMP;} break;
+        case OP_GETUPVAL: {
+            const Value *v = &vs->cl->uv.values[ins->u.bc.b];
+            if (v->t == VT_VALUEP) {
+                v = v->u.o;
+            }
+            _copy_value(_get_reg(vs, ins->a), v);
+        } break;
 
         case OP_GETGLOBAL: {
             const Value *k = &fn->k.values[Kst(ins->u.bx)];
@@ -553,6 +559,7 @@ static void _exec_step(V_State *vs) {
             const Value *a = _get_reg(vs, ins->a);
             V_CHECKTYPE(a, VT_CLOSURE);
             V_Closure *cl = a->u.o;
+            vs->cl = cl;
 
             /* function frame */
             _push_func(vs, cl->fnidx, ins->a, ins->u.bc.c, vs->ip + 1);
@@ -644,6 +651,17 @@ static void _exec_step(V_State *vs) {
         case OP_CLOSURE: {
             V_Closure *c = NEW(V_Closure);
             c->fnidx = ins->u.bx + 1;   /* skip `main' */
+
+            /* upvalues */
+            c->uv.count = ins->a;
+            if (ins->a > 0) {
+                c->uv.values = NEW_ARRAY(Value, ins->a);
+                for (int i = 0; i < ins->a; ++i) {
+                    Value *v = &c->uv.values[i];
+                    v->t = VT_VALUEP;
+                    v->u.o = _get_reg(vs, i);
+                }
+            }
 
             Value v;
             v.t = VT_CLOSURE;

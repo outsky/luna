@@ -39,6 +39,7 @@ typedef enum {
     VT_BOOL,
     VT_TABLE,
     VT_CLOSURE,
+    VT_VALUEP,  /* pointer to Value */
 } ValueType;
 
 typedef struct {
