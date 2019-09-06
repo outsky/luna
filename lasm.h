@@ -145,6 +145,7 @@ typedef struct {
     list *funcs;
     int curfunc;    /* 0: in global scope */
 
+    unsigned char cached;
     A_Token curtok;
 } A_State;
 
@@ -152,6 +153,7 @@ A_State* A_newstate(const char *srcfile);
 void A_freestate(A_State *as);
 
 A_TokenType A_nexttok(A_State *as);
+void A_cachetok(A_State *as);
 
 void A_parse(A_State *as);
 void A_createbin(const A_State *as, const char *outfile);

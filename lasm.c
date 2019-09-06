@@ -10,6 +10,12 @@
     }\
 } while (0)
 
+#define skip(tt) do {\
+    if (A_nexttok(as) != tt) {\
+        A_cachetok(as);\
+    }\
+} while (0)
+
 
 A_OpMode A_OpModes[] = {
 /*     A        B       C     mode		   opcode	*/
@@ -149,7 +155,16 @@ static int _getopcode(const char *opname) {
     return -1;
 }
 
+void A_cachetok(A_State *as) {
+    as->cached = 1;
+}
+
 A_TokenType A_nexttok(A_State *as) {
+    if (as->cached) {
+        as->cached = 0;
+        return as->curtok.t;
+    }
+
     int maxidx = strlen(as->src);
     if (as->curidx >= maxidx) {
         return A_TT_EOT;
@@ -436,7 +451,7 @@ static void _parse_instr(A_State *as) {
         expect(A_TT_INT);
         a = as->curtok.u.n;
         if (om->b != OpArgN || om->c != OpArgN) {
-            expect(A_TT_COMMA);
+            skip(A_TT_COMMA);
         }
     }
 
@@ -444,7 +459,7 @@ static void _parse_instr(A_State *as) {
         expect(A_TT_INT);
         b = as->curtok.u.n;
         if (om->c != OpArgN) {
-            expect(A_TT_COMMA);
+            skip(A_TT_COMMA);
         }
     }
 
