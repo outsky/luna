@@ -30,7 +30,7 @@ FUNC main {
 ;function <x.lua:3,5> (4 instructions, 16 bytes at 0x55be0bda6ce0)
 ;1 param, 2 slots, 1 upvalue, 1 local, 0 constants, 0 functions
 FUNC add {
-    PARAM 1
+    P 1
 
     GETUPVAL 	1,0	; a
     ADD      	1,1,0
