@@ -289,7 +289,7 @@ A_TokenType A_nexttok(A_State *as) {
                     char *tmp = strndup(as->src + begin, as->curidx - begin);
                     if (strcmp(tmp, "K") == 0) {FREE(tmp); as->curtok.t = A_TT_CONST; return as->curtok.t;}
                     if (strcmp(tmp, "R") == 0) {FREE(tmp); as->curtok.t = A_TT_REGCOUNT; return as->curtok.t;}
-                    if (strcmp(tmp, "PARAM") == 0) {FREE(tmp); as->curtok.t = A_TT_PARAM; return as->curtok.t;}
+                    if (strcmp(tmp, "P") == 0) {FREE(tmp); as->curtok.t = A_TT_PARAM; return as->curtok.t;}
                     if (strcmp(tmp, "FUNC") == 0) {FREE(tmp); as->curtok.t = A_TT_FUNC; return as->curtok.t;}
 
                     int oc = _getopcode(tmp);
