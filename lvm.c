@@ -600,8 +600,13 @@ static void _exec_step(V_State *vs) {
             const Value *ret = _get_stack(vs, -1 - fn->regcount - 1);
             V_CHECKTYPE(ret, VT_INT);
             vs->ip = ret->u.n - 1;
+
             _pop(vs, 1 + fn->regcount + 1); /* fid|a|c, regs, ret */
             vs->curframe = vs->stk.top - 1;
+
+            fid = _get_stack(vs, -1);
+            vs->curfunc = V_UNPACK_FID(fid->u.n);
+
             for (int i = a; i <= a + c - 2; ++i) {
                 int idx = ins->a + i - a;
                 if (idx > ins->a + ins->u.bc.b - 2) {
@@ -610,9 +615,6 @@ static void _exec_step(V_State *vs) {
                     _copy_value(_get_reg(vs, i), _get_stack(vs, idx + 1));
                 }
             }
-
-            fid = _get_stack(vs, -1);
-            vs->curfunc = V_UNPACK_FID(fid->u.n);
         } break;
 
         case OP_FORLOOP: {
@@ -727,7 +729,7 @@ static void _push_func(V_State *vs, int fnidx, int a, int c, int retip) {
     _push(vs, &v);
 
     /* registers */
-    const V_Func *fn = _get_curfunc(vs);
+    const V_Func *fn = _get_func(vs, fnidx);
     if (fn == NULL) {
         error("function not exists: %d", fnidx);
     }
