@@ -202,7 +202,7 @@ static void _pstate(const V_State *vs) {
     const V_Func *fn = _get_curfunc(vs);
 
     printf("{\n");
-    printf("  %s(%d) IP: %d\n", fn->name, vs->curfunc, vs->ip);
+    printf("  %s(%d): R %d, P %d, K %d, IP %d\n", fn->name, vs->curfunc, fn->regcount, fn->param, fn->k.count, vs->ip);
     printf("  STACK:\n");
     for (int i = vs->stk.top - 1; i >= 0; --i) {
         if (vs->stk.top - i <= (1 + fn->regcount + 1)) {
@@ -579,7 +579,35 @@ static void _exec_step(V_State *vs) {
             vs->curframe = vs->stk.top - 1;
         } break;
 
-        case OP_TAILCALL: {NOT_IMP;} break;
+        case OP_TAILCALL: {
+            const Value *a = _get_reg(vs, ins->a);
+            V_CHECKTYPE(a, VT_CLOSURE);
+            V_Closure *cl = a->u.o;
+            vs->cl = cl;
+
+            /* keep old a|c, ret */
+            const Value *fid = _get_stack(vs, -1);
+            int oa = V_UNPACK_A(fid->u.n);
+            int oc = V_UNPACK_C(fid->u.n);
+
+            const V_Func *ofn = _get_curfunc(vs);
+            const Value *oret = _get_stack(vs, -1 - ofn->regcount - 1);
+            int oip = oret->u.n;
+            _pop(vs, 1 + ofn->regcount + 1); /* fid|a|c, regs, ret */
+
+            /* function frame */
+            _push_func(vs, cl->fnidx, oa, oc, oip);
+
+            /* push params */
+            const V_Func *fn = _get_func(vs, cl->fnidx);
+            for (int i = 0; i < fn->param; ++i) {
+                _set_param(vs, cl->fnidx, i, _get_reg(vs, ins->a + 1 + i));
+            }
+
+            vs->curfunc = cl->fnidx;
+            vs->ip = -1;
+            vs->curframe = vs->stk.top - 1;
+        } break;
 
         case OP_RETURN: {
             if (vs->curfunc == 0) {
