@@ -1,0 +1,34 @@
+;function fn(a)
+;    return a * 100
+;end
+;g = fn(8, 200)
+
+;main <x.lua:0,0> (8 instructions, 32 bytes at 0x559aa4851870)
+;0+ params, 3 slots, 0 upvalues, 0 locals, 4 constants, 1 function
+FUNC main {
+    R 3
+    K "fn"
+    K "g"
+    K 8
+    K 200
+
+    CLOSURE  	0 0	; 0x559aa4851a50
+    SETGLOBAL	0 -1	; fn
+    GETGLOBAL	0 -1	; fn
+    LOADK    	1 -3	; 8
+    LOADK    	2 -4	; 200
+    CALL     	0 3 2
+    SETGLOBAL	0 -2	; g
+    RETURN   	0 1
+}
+
+;function <x.lua:1,3> (3 instructions, 12 bytes at 0x559aa4851a50)
+;1 param, 2 slots, 0 upvalues, 1 local, 1 constant, 0 functions
+FUNC fn {
+    P 1
+    K 100
+
+    MUL      	1 0 -1	; - 100
+    RETURN   	1 2
+    RETURN   	0 1
+}
