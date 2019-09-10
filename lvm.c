@@ -577,7 +577,12 @@ static void _exec_step(V_State *vs) {
             const V_Func *fn = _get_func(vs, cl->fnidx);
             if (ins->u.bc.c != 1) {
                 for (int i = 0; i < fn->param; ++i) {
-                    _push(vs, _get_reg(vs, ins->a + 1 + i));
+                    int idx = ins->a + 1 + i;
+                    if (vs->curci->base + 1 + idx >= callee->base) {
+                        _push(vs, NULL);
+                    } else {
+                        _push(vs, _get_reg(vs, ins->a + 1 + i));
+                    }
                 }
             } else {    /* vararg */
                 for (int i = ins->a + 1; i < callee->base - 1; ++i) {
