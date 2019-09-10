@@ -575,8 +575,14 @@ static void _exec_step(V_State *vs) {
 
             /* push params */
             const V_Func *fn = _get_func(vs, cl->fnidx);
-            for (int i = 0; i < fn->param; ++i) {
-                _push(vs, _get_reg(vs, ins->a + 1 + i));
+            if (ins->u.bc.c != 1) {
+                for (int i = 0; i < fn->param; ++i) {
+                    _push(vs, _get_reg(vs, ins->a + 1 + i));
+                }
+            } else {    /* vararg */
+                for (int i = ins->a + 1; i < callee->base - 1; ++i) {
+                    _push(vs, _get_reg(vs, i));
+                }
             }
 
             vs->stk.top = callee->base + fn->regcount + 1;
@@ -689,7 +695,12 @@ static void _exec_step(V_State *vs) {
             _copy_value(_get_reg(vs, ins->a), &v);
         } break;
 
-        case OP_VARARG: {NOT_IMP;} break;
+        case OP_VARARG: {
+            for (int i = ins->a + ins->u.bc.b - 1; i>= ins->a; --i) {
+                _copy_value(_get_reg(vs, i), _get_reg(vs, i - ins->a));
+            }
+        } break;
+
         default: {
             error("unknown instruction type: %d", ins->t);
         } break;
