@@ -40,6 +40,7 @@ typedef enum {
     VT_TABLE,
     VT_CLOSURE,
     VT_VALUEP,  /* pointer to Value */
+    VT_CALLINFO,
 } ValueType;
 
 typedef struct {

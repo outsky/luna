@@ -74,9 +74,14 @@ void _copy_value(Value *dest, const Value *src) {
         case VT_STRING: {dest->u.s = strdup(src->u.s);} break;
 
         case VT_TABLE:
+        case VT_CALLINFO:
         case VT_CLOSURE: {dest->u.o = src->u.o;} break;
 
-        default: {/* nothing to copy */} break;
+        case VT_NIL: {/* nothing to copy */} break;
+
+        default: {
+            error("not imp: %d", src->t);
+        } break;
     }
 }
 

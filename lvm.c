@@ -2,6 +2,8 @@
 #include "lvm.h"
 #include "ltable.h"
 
+#define V_MIN_CI 8
+
 #define V_PACK_FID_A_C(fid, a, c) (CAST(unsigned char, fid) + (CAST(unsigned char, a) << 8) + (CAST(unsigned short, c) << 16))
 #define V_UNPACK_FID(n) (CAST(unsigned int, n) << 24 >> 24)
 #define V_UNPACK_A(n) (CAST(unsigned int, n) << 16 >> 24)
@@ -17,9 +19,10 @@ static void _printins(const V_State *vs, const A_Instr *ins);
 static V_Func* _get_curfunc(const V_State *vs);
 static V_Func* _get_func(const V_State *vs, int idx);
 static Value* _get_reg(const V_State *vs, int idx);
-static void _push_func(V_State *vs, int fnidx, int a, int c, int retip);
+static void _push(V_State *vs, const Value *v);
 static void _pop(V_State *vs, int n);
-static void _set_param(V_State *vs, int fnidx, int i, const Value *v);
+static V_CallInfo* _pushci(V_State *vs, int func, int ip, int a, int c);
+static void _popci(V_State *vs);
 
 V_State* V_newstate(int stacksize) {
     V_State *vs = NEW(V_State);
@@ -29,6 +32,11 @@ V_State* V_newstate(int stacksize) {
 
     vs->stk.size = stacksize;
     vs->stk.values = NEW_ARRAY(Value, stacksize);
+
+    vs->cis.size = V_MIN_CI;
+    vs->cis.count = 0;
+    vs->cis.values = NEW_ARRAY(V_CallInfo*, V_MIN_CI);
+
     return vs;
 }
 
@@ -169,10 +177,6 @@ void V_load(V_State *vs, const char *binfile) {
     _show_status(vs);
 }
 
-static void _resetstate(V_State *vs) {
-    vs->ip = 0;
-}
-
 static void _pvalue(const V_State *vs, const Value *v) {
     switch (v->t) {
         case VT_INT: {printf("%d\n", v->u.n);} break;
@@ -194,7 +198,11 @@ static void _pvalue(const V_State *vs, const Value *v) {
             const V_Func *fn = _get_func(vs, c->fnidx);
             printf("closure(%d):%s\n", c->fnidx, fn->name);
         } break;
-        default: {printf("?(%d)\n", v->t);} break;
+        case VT_CALLINFO: {
+            const V_CallInfo *ci = CAST(V_CallInfo*, v->u.o);
+            printf("ci(%d:%d):%d\n", ci->func, ci->ip, ci->base);
+        } break;
+        default: {error("?(%d)\n", v->t);} break;
     }
 }
 
@@ -202,10 +210,10 @@ static void _pstate(const V_State *vs) {
     const V_Func *fn = _get_curfunc(vs);
 
     printf("{\n");
-    printf("  %s(%d): R %d, P %d, K %d, IP %d\n", fn->name, vs->curfunc, fn->regcount, fn->param, fn->k.count, vs->ip);
+    printf("  %s(%d): R %d, P %d, K %d, IP %d\n", fn->name, vs->curci->func, fn->regcount, fn->param, fn->k.count, vs->curci->ip);
     printf("  STACK:\n");
     for (int i = vs->stk.top - 1; i >= 0; --i) {
-        if (vs->stk.top - i <= (1 + fn->regcount + 1)) {
+        if (i >= vs->curci->base) {
             printf("    *%d.\t", i);
         } else {
             printf("    %d.\t", i);
@@ -279,28 +287,25 @@ static void _printins(const V_State *vs, const A_Instr *ins) {
     printf(">\n");
 }
 
-/* idx: relative position from `top'
-**      0: top
-**      1: top + 1
-**     -1: top - 1
-*/
 static Value* _get_stack(const V_State *vs, int idx) {
-    const V_Stack *stk = &vs->stk;
-    return &(stk->values[stk->top + idx]);
+    if (idx >= vs->stk.top) {
+        error("stack overflow: %d of %d", idx, vs->stk.top);
+    }
+    return &vs->stk.values[idx];
 }
 
 static Value* _get_reg(const V_State *vs, int idx) {
-    V_Func *fn = _get_curfunc(vs);
-    if (fn == NULL) {
-        error("function is null: %d", vs->curfunc);
-    }
     const V_Stack *stk = &vs->stk;
-    return &(stk->values[vs->curframe - fn->regcount + idx]);
+    int regidx = vs->curci->base + 1 + idx;
+    if (regidx >= stk->size) {
+        error("stack overflow: %d of %d", regidx, stk->size);
+    }
+    return &stk->values[regidx];
 }
 
 static void _exec_step(V_State *vs) {
     V_Func *fn = _get_curfunc(vs);
-    const A_Instr *ins = &fn->ins.instrs[vs->ip];
+    const A_Instr *ins = &fn->ins.instrs[vs->curci->ip];
     _printins(vs, ins);
 
     switch (ins->t) {
@@ -318,7 +323,7 @@ static void _exec_step(V_State *vs) {
             src.u.n = ins->u.bc.b != 0;
             _copy_value(_get_reg(vs, ins->a), &src);
             if (ins->u.bc.c) {
-                ++vs->ip;
+                ++vs->curci->ip;
             }
         } break;
 
@@ -520,7 +525,7 @@ static void _exec_step(V_State *vs) {
         } break;
 
         case OP_JMP: {
-            vs->ip += ins->u.bx;
+            vs->curci->ip += ins->u.bx;
         } break;
 
         case OP_EQ:
@@ -538,7 +543,7 @@ static void _exec_step(V_State *vs) {
                 default: {error("impossible: %d", ins->t);} break;
             }
             if (result) {
-                ++vs->ip;
+                ++vs->curci->ip;
             }
         } break;
 
@@ -546,7 +551,7 @@ static void _exec_step(V_State *vs) {
             /* if not (R(A) <=> C) then pc++ */
             /* TODO: what does the `<=>' mean? I just consider it to `=='*/
             int a = (int)_get_value_float(_get_reg(vs, ins->a));
-            if (a != ins->u.bc.c) {++vs->ip;}
+            if (a != ins->u.bc.c) {++vs->curci->ip;}
         } break;
 
         case OP_TESTSET: {
@@ -555,7 +560,7 @@ static void _exec_step(V_State *vs) {
             if (b == ins->u.bc.c) {
                 _copy_value(_get_reg(vs, ins->a), _get_reg(vs, ins->u.bc.b));
             } else {
-                ++vs->ip;
+                ++vs->curci->ip;
             }
         } break;
 
@@ -565,18 +570,17 @@ static void _exec_step(V_State *vs) {
             V_Closure *cl = a->u.o;
             vs->cl = cl;
 
-            /* function frame */
-            _push_func(vs, cl->fnidx, ins->a, ins->u.bc.c, vs->ip + 1);
+            /* push callee */
+            V_CallInfo *callee = _pushci(vs, cl->fnidx, -1, ins->a, ins->u.bc.c);
 
             /* push params */
             const V_Func *fn = _get_func(vs, cl->fnidx);
             for (int i = 0; i < fn->param; ++i) {
-                _set_param(vs, cl->fnidx, i, _get_reg(vs, ins->a + 1 + i));
+                _push(vs, _get_reg(vs, ins->a + 1 + i));
             }
 
-            vs->curfunc = cl->fnidx;
-            vs->ip = -1;
-            vs->curframe = vs->stk.top - 1;
+            vs->stk.top = callee->base + fn->regcount + 1;
+            vs->curci = callee;
         } break;
 
         case OP_TAILCALL: {
@@ -585,64 +589,45 @@ static void _exec_step(V_State *vs) {
             V_Closure *cl = a->u.o;
             vs->cl = cl;
 
-            /* keep old a|c, ret */
-            const Value *fid = _get_stack(vs, -1);
-            int oa = V_UNPACK_A(fid->u.n);
-            int oc = V_UNPACK_C(fid->u.n);
-
-            const V_Func *ofn = _get_curfunc(vs);
-            const Value *oret = _get_stack(vs, -1 - ofn->regcount - 1);
-            int oip = oret->u.n;
-            _pop(vs, 1 + ofn->regcount + 1); /* fid|a|c, regs, ret */
-
-            /* function frame */
-            _push_func(vs, cl->fnidx, oa, oc, oip);
-
-            /* push params */
+            /* copy params */
             const V_Func *fn = _get_func(vs, cl->fnidx);
             for (int i = 0; i < fn->param; ++i) {
-                _set_param(vs, cl->fnidx, i, _get_reg(vs, ins->a + 1 + i));
+                int idx = ins->a + 1 + i;
+                if (idx >= vs->stk.top) {
+                    _copy_value(_get_reg(vs, i), NULL);
+                } else {
+                    _copy_value(_get_reg(vs, i), _get_reg(vs, idx));
+                }
             }
 
-            vs->curfunc = cl->fnidx;
-            vs->ip = -1;
-            vs->curframe = vs->stk.top - 1;
+            /* set ci */
+            vs->curci->func = cl->fnidx;
+            vs->curci->ip = -1;
+
+            /* stack */
+            vs->stk.top = vs->curci->base + fn->regcount + 1;
         } break;
 
         case OP_RETURN: {
-            if (vs->curfunc == 0) {
+            if (vs->curci->func == 0) {
                 /* TODO: better idea? */
                 return;
             }
-            const V_Func *fn = _get_curfunc(vs);
-            if (fn == NULL) {
-                error("current function is null: %d", vs->curfunc);
-            }
 
-            /* fid|a|c */
-            const Value *fid = _get_stack(vs, -1);
-            V_CHECKTYPE(fid, VT_INT);
-            int a = V_UNPACK_A(fid->u.n);
-            int c = V_UNPACK_C(fid->u.n);
-
-            const Value *ret = _get_stack(vs, -1 - fn->regcount - 1);
-            V_CHECKTYPE(ret, VT_INT);
-            vs->ip = ret->u.n - 1;
-
-            _pop(vs, 1 + fn->regcount + 1); /* fid|a|c, regs, ret */
-            vs->curframe = vs->stk.top - 1;
-
-            fid = _get_stack(vs, -1);
-            vs->curfunc = V_UNPACK_FID(fid->u.n);
+            V_CallInfo *caller = vs->cis.values[vs->cis.count - 2];
+            int a = vs->curci->a;
+            int c = vs->curci->c;
 
             for (int i = a; i <= a + c - 2; ++i) {
                 int idx = ins->a + i - a;
-                if (idx > ins->a + ins->u.bc.b - 2) {
-                    _copy_value(_get_reg(vs, i), NULL);
+                if (idx > ins->a + ins->u.bc.b - 2) { /* TODO: deal with b == 0 */
+                    _copy_value(_get_stack(vs, caller->base + 1 + i), NULL);
                 } else {
-                    _copy_value(_get_reg(vs, i), _get_stack(vs, idx + 1));
+                    _copy_value(_get_stack(vs, caller->base + 1 + i), _get_reg(vs, idx));
                 }
             }
+
+            _popci(vs);
         } break;
 
         case OP_FORLOOP: {
@@ -655,7 +640,7 @@ static void _exec_step(V_State *vs) {
 
             float a1f = _get_value_float(_get_reg(vs, ins->a + 1));
             if (v.u.f <= a1f) {
-                vs->ip += ins->u.bx;
+                vs->curci->ip += ins->u.bx;
                 _copy_value(_get_reg(vs, ins->a + 3), &v);
             }
         } break;
@@ -667,7 +652,7 @@ static void _exec_step(V_State *vs) {
             v.t = VT_FLOAT;
             v.u.f = af - a2f;
             _copy_value(_get_reg(vs, ins->a), &v);
-            vs->ip += ins->u.bx;
+            vs->curci->ip += ins->u.bx;
         } break;
 
         case OP_TFORLOOP: {NOT_IMP;} break;
@@ -724,11 +709,11 @@ static V_Func* _get_func(const V_State *vs, int idx) {
 }
 
 static V_Func* _get_curfunc(const V_State *vs) {
-    if (vs->curfunc >= vs->funcs->count) {
-        error("curfunc overflow: %d of %d", vs->curfunc, vs->funcs->count);
+    if (vs->curci->func >= vs->funcs->count) {
+        error("curci->func overflow: %d of %d", vs->curci->func, vs->funcs->count);
     }
 
-    return _get_func(vs, vs->curfunc);
+    return _get_func(vs, vs->curci->func);
 }
 
 static void _push(V_State *vs, const Value *v) {
@@ -740,52 +725,50 @@ static void _pop(V_State *vs, int n) {
     vs->stk.top -= n;
 }
 
-static void _set_param(V_State *vs, int fnidx, int i, const Value *v) {
-    const V_Func *fn = _get_func(vs, fnidx);
-    Value *p = _get_stack(vs, -1 - fn->regcount + i);
-    _copy_value(p, v);
+static V_CallInfo* _newci(int func, int ip, int base, int a, int c) {
+    V_CallInfo *ci = NEW(V_CallInfo);
+    ci->func = func;
+    ci->ip = ip;
+    ci->base = base;
+    ci->a = a;
+    ci->c = c;
+    return ci;
 }
 
-/*
-**  push `ret', `regs', `fid|A|C'
-*/
-static void _push_func(V_State *vs, int fnidx, int a, int c, int retip) {
-    /* ret */
-    Value v;
-    v.t = VT_INT;
-    v.u.n = retip;
-    _push(vs, &v);
+/* return next top */
+static void _popci(V_State *vs) {
+    _pop(vs, vs->stk.top - vs->curci->base);
+    vs->curci = vs->cis.values[--vs->cis.count - 1];
+}
 
-    /* registers */
-    const V_Func *fn = _get_func(vs, fnidx);
-    if (fn == NULL) {
-        error("function not exists: %d", fnidx);
-    }
-    vs->stk.top += fn->regcount;
-    if (vs->stk.top >= vs->stk.size) {
-        error("stack overflow: %d of %d by function %s(%d) adding %d", vs->stk.top, vs->stk.size, fn->name, fnidx, fn->regcount);
-    }
+static V_CallInfo* _pushci(V_State *vs, int func, int ip, int a, int c) {
+    V_CallInfo *ci = _newci(func, ip, vs->stk.top, a, c);
+    vs->cis.values[vs->cis.count++] = ci;
 
-    /* function index */
-    v.t = VT_INT;
-    v.u.n = V_PACK_FID_A_C(fnidx, a, c);
-    _push(vs, &v);
+    Value vci;
+    vci.t = VT_CALLINFO;
+    vci.u.o = ci;
+    _push(vs, &vci);
+
+    return ci;
 }
 
 void V_run(V_State *vs) {
-    _resetstate(vs);
-    _push_func(vs, 0, 0, 0, 0);
-    vs->curframe = vs->stk.top - 1;
+    /* main */
+    vs->curci = _pushci(vs, 0, 0, 0, 0);
+    const V_Func *fn = _get_func(vs, 0);
+    vs->stk.top = fn->regcount + 1;
+
     _pstate(vs);
 
     for (;;) {
         V_Func *fn = _get_curfunc(vs);
-        if (vs->curfunc == 0 && vs->ip >= fn->ins.count) {
+        if (vs->curci->func == 0 && vs->curci->ip >= fn->ins.count) {
             break;
         }
         _exec_step(vs);
 
-        ++vs->ip;
+        ++vs->curci->ip;
         _pstate(vs);
     }
 }

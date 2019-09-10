@@ -23,13 +23,8 @@ typedef struct {
 } V_Func;
 
 typedef struct {
-    int count;
-    Value *values;
-} V_UpValue;
-
-typedef struct {
     int fnidx;
-    V_UpValue uv;
+    V_ValueStream uv;
 } V_Closure;
 
 typedef struct {
@@ -39,18 +34,31 @@ typedef struct {
 } V_Stack;
 
 typedef struct {
+    int func;
+    int ip;
+    int a;
+    int c;
+    int base; /* stack slot of this func */
+} V_CallInfo;
+
+typedef struct {
+    int size;
+    int count;
+    V_CallInfo **values;
+} V_CallInfoStream;
+
+typedef struct {
     int major;
     int minor;
 
     ltable *globals;
 
     list *funcs;    /* main function always at head */
-    int curfunc;    /* 0: main */
-    int curframe;
-    int ip;
 
     V_Closure *cl;
     V_Stack stk;
+    V_CallInfoStream cis;
+    V_CallInfo *curci;
 } V_State;
 
 V_State* V_newstate(int stacksize);
