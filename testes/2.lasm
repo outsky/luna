@@ -17,6 +17,8 @@ FUNC main {
     K "g"
     K 444
     K 666
+    F 1
+    F 2
 
     CLOSURE  	0 0	; 0x557ca120ea50
 	SETGLOBAL	0 -1	; add

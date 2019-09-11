@@ -16,6 +16,8 @@ FUNC main {
     K "fact"
     K "g"
     K 3
+    F 1
+    F 2
 
     CLOSURE  	0 0	; 0x55a85c67fa50
     SETGLOBAL	0 -1	; tail

@@ -9,6 +9,7 @@ FUNC main {
     K "fn"
     K "g"
     K 8
+    F 1
 
     CLOSURE  	0 0	; 0x561c7e5d4a50
     SETGLOBAL	0 -1	; fn

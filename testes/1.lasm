@@ -10,6 +10,7 @@
 ;0+ params, 3 slots, 0 upvalues, 1 local, 4 constants, 1 function
 FUNC main {
     R 3
+    F 1
 
     K 123
     K "add"

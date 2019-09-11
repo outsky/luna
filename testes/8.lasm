@@ -1,0 +1,84 @@
+;function trav(t)
+;    local idx = 0
+;    return function()
+;        idx = idx + 1
+;        if not t[idx] then
+;            return nil
+;        end
+;        return idx, t[idx]
+;    end
+;end
+;
+;for k, v in trav({11,22,33}) do
+;    gk = k
+;    gv = v
+;end
+
+;main <x.lua:0,0> (15 instructions, 60 bytes at 0x55b2db510870)
+;0+ params, 6 slots, 0 upvalues, 5 locals, 6 constants, 1 function
+FUNC main {
+    R 6
+    K "trav"
+    K 11
+    K 22
+    K 33
+    K "gk"
+    K "gv"
+    F 1
+
+    CLOSURE  	0 0	; 0x55b2db510a50
+    SETGLOBAL	0 -1	; trav
+    GETGLOBAL	0 -1	; trav
+    NEWTABLE 	1 3 0
+    LOADK    	2 -2	; 11
+    LOADK    	3 -3	; 22
+    LOADK    	4 -4	; 33
+    SETLIST  	1 3 1	; 1
+    CALL     	0 2 4
+    JMP      	2	; to 13
+    SETGLOBAL	3 -5	; gk
+    SETGLOBAL	4 -6	; gv
+    TFORLOOP 	0 2
+    JMP      	-4	; to 11
+    RETURN   	0 1
+}
+
+;function <x.lua:1,10> (6 instructions, 24 bytes at 0x55b2db510a50)
+;1 param, 3 slots, 0 upvalues, 2 locals, 1 constant, 1 function
+FUNC trav {
+    P 1
+    R 3
+    K 0
+    F 2
+
+    LOADK    	1 -1	; 0
+    CLOSURE  	2 0	; 0x55b2db510e90
+    MOVE     	0 1
+    MOVE     	0 0
+    RETURN   	2 2
+    RETURN   	0 1
+}
+
+;function <x.lua:3,9> (16 instructions, 64 bytes at 0x55b2db510e90)
+;0 params, 3 slots, 2 upvalues, 0 locals, 1 constant, 0 functions
+FUNC t_in {
+    R 3
+    K 1
+
+    GETUPVAL 	0 0	; idx
+    ADD      	0 0 -1	; - 1
+    SETUPVAL 	0 0	; idx
+    GETUPVAL 	0 1	; t
+    GETUPVAL 	1 0	; idx
+    GETTABLE 	0 0 1
+    TEST     	0 0 1
+    JMP      	2	; to 11
+    LOADNIL  	0 0
+    RETURN   	0 2
+    GETUPVAL 	0 0	; idx
+    GETUPVAL 	1 1	; t
+    GETUPVAL 	2 0	; idx
+    GETTABLE 	1 1 2
+    RETURN   	0 3
+    RETURN   	0 1
+}

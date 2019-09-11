@@ -11,6 +11,7 @@ FUNC main {
     K "fn"
     K 1
     K 2
+    F 1
 
     CLOSURE  	0 0	; 0x565029c1ca50
     SETGLOBAL	0 -1	; fn
