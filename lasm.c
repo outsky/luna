@@ -119,6 +119,7 @@ static void _add_func(A_State *as, const char *name) {
     f->regcount = 2;    /* default */
     f->consts = list_new();
     f->instrs = list_new();
+    f->subfuncs = list_new();
 
     list_pushback(as->funcs, f);
     as->curfunc = as->funcs->count;
@@ -305,6 +306,7 @@ A_TokenType A_nexttok(A_State *as) {
                     if (strcmp(tmp, "K") == 0) {FREE(tmp); as->curtok.t = A_TT_CONST; return as->curtok.t;}
                     if (strcmp(tmp, "R") == 0) {FREE(tmp); as->curtok.t = A_TT_REGCOUNT; return as->curtok.t;}
                     if (strcmp(tmp, "P") == 0) {FREE(tmp); as->curtok.t = A_TT_PARAM; return as->curtok.t;}
+                    if (strcmp(tmp, "F") == 0) {FREE(tmp); as->curtok.t = A_TT_SUBFUNC; return as->curtok.t;}
                     if (strcmp(tmp, "FUNC") == 0) {FREE(tmp); as->curtok.t = A_TT_FUNC; return as->curtok.t;}
 
                     int oc = _getopcode(tmp);
@@ -407,6 +409,19 @@ static A_Func* _get_curfunc(const A_State *as) {
         n = n->next;
     }
     return CAST(A_Func*, n->data);
+}
+
+static void _parse_subfunc(A_State *as) {
+    expect(A_TT_INT);
+    
+    Value *v = NEW(Value);
+    v->t = VT_INT;
+    v->u.n = as->curtok.u.n;
+
+    A_Func *fn = _get_curfunc(as);
+    list_pushback(fn->subfuncs, v);
+
+    expect(A_TT_NEWLINE);
 }
 
 static void _parse_const(A_State *as) {
@@ -521,6 +536,7 @@ void A_parse(A_State *as) {
                 as->curfunc = 0;
             } break;
             case A_TT_CONST: {_parse_const(as);} break;
+            case A_TT_SUBFUNC: {_parse_subfunc(as);} break;
             case A_TT_INSTR: {_parse_instr(as);} break;
             case A_TT_PARAM: {_parse_param(as);} break;
             case A_TT_REGCOUNT: {_parse_regcount(as);} break;
@@ -553,6 +569,12 @@ FUNCTIONS:
                 type (1 byte)
                 [size (4 bytes) only for string]
                 data (4 bytes for number)
+            }
+
+        SUBFUNCS:
+            count (4 bytes)
+            {
+                funcid (4 bytes)
             }
 
         INSTRUCTIONS:
@@ -614,6 +636,13 @@ void A_createbin(const A_State *as, const char *outfile) {
             } else {
                 error("unexpected const type: %d", k->t);
             }
+        }
+
+        /* SUBFUNCS */
+        fwrite(&fn->subfuncs->count, 4, 1, f);
+        for (lnode *n = fn->subfuncs->head; n != NULL; n = n->next) {
+            Value *v = CAST(Value*, n->data);
+            fwrite(&v->u.n, 4, 1, f);
         }
 
         /* INSTRUCTIONS */

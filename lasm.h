@@ -104,6 +104,7 @@ typedef enum {
     A_TT_CONST,
     A_TT_PARAM,     /* params count */
     A_TT_REGCOUNT,  /* regs count */
+    A_TT_SUBFUNC,   /* sub function */
     A_TT_FUNC,
     A_TT_INSTR,     /* instruction */
     A_TT_IDENT,
@@ -134,6 +135,7 @@ typedef struct {
     int regcount;
     list *consts;
     list *instrs;
+    list *subfuncs;
 } A_Func;
 
 typedef struct {

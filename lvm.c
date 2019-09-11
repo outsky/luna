@@ -127,6 +127,17 @@ void V_load(V_State *vs, const char *binfile) {
             }
         }
 
+        /* SUBFUNCS */
+        FREAD(&fn->subf.count, 4, 1, f);
+        if (fn->subf.count > 0) {
+            fn->subf.values = NEW_ARRAY(Value, fn->subf.count);
+            for (int i = 0; i < fn->subf.count; ++i) {
+                Value *v = &fn->subf.values[i];
+                v->t = VT_INT;
+                FREAD(&v->u.n, 4, 1, f);
+            }
+        }
+
         /* INSTRUCTIONS */
         FREAD(&fn->ins.count, 4, 1, f);
         if (fn->ins.count > 0) {
@@ -679,8 +690,13 @@ static void _exec_step(V_State *vs) {
         case OP_CLOSE: {NOT_IMP;} break;
 
         case OP_CLOSURE: {
+            V_Func *fn = _get_curfunc(vs);
+            if (ins->u.bx >= fn->subf.count) {
+                error("subfunc idx overflow: %d of %d", ins->u.bx, fn->subf.count);
+            }
+
             V_Closure *c = NEW(V_Closure);
-            c->fnidx = ins->u.bx + 1;   /* skip `main' */
+            c->fnidx = fn->subf.values[ins->u.bx].u.n;
 
             /* upvalues */
             c->uv.count = ins->a;

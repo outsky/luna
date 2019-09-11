@@ -20,6 +20,7 @@ typedef struct {
     int regcount;
     V_ValueStream k;
     V_InstrStream ins;
+    V_ValueStream subf;
 } V_Func;
 
 typedef struct {
