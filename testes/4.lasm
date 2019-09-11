@@ -12,6 +12,7 @@ FUNC main {
     K "f1"
     K "g"
     K "f2"
+    F 1
 
     CLOSURE  	0 0	; 0x55be09ba6a50
     SETGLOBAL	0 -1	; f1
@@ -27,6 +28,7 @@ FUNC main {
 ;0 params, 2 slots, 0 upvalues, 0 locals, 1 constant, 1 function
 FUNC f1 {
     K "f2"
+    F 2
 
     CLOSURE  	0 0	; 0x55be09ba6c00
     SETGLOBAL	0 -1	; f2
