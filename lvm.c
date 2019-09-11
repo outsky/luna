@@ -321,18 +321,18 @@ static void _exec_step(V_State *vs) {
 
     switch (ins->t) {
         case OP_MOVE: {
-            _copy_value(_get_reg(vs, ins->a), _get_reg(vs, ins->u.bc.b));
+            copy_value(_get_reg(vs, ins->a), _get_reg(vs, ins->u.bc.b));
         } break;
 
         case OP_LOADK: {
-            _copy_value(_get_reg(vs, ins->a), &fn->k.values[Kst(ins->u.bx)]);
+            copy_value(_get_reg(vs, ins->a), &fn->k.values[Kst(ins->u.bx)]);
         } break;
 
         case OP_LOADBOOL: {
             Value src;
             src.t = VT_BOOL;
             src.u.n = ins->u.bc.b != 0;
-            _copy_value(_get_reg(vs, ins->a), &src);
+            copy_value(_get_reg(vs, ins->a), &src);
             if (ins->u.bc.c) {
                 ++vs->curci->ip;
             }
@@ -342,7 +342,7 @@ static void _exec_step(V_State *vs) {
             Value src;
             src.t = VT_NIL;
             for (int i = ins->a; i <= ins->u.bc.b; ++i) {
-                _copy_value(_get_reg(vs, i), &src);
+                copy_value(_get_reg(vs, i), &src);
             }
         } break;
 
@@ -351,7 +351,7 @@ static void _exec_step(V_State *vs) {
             if (v->t == VT_VALUEP) {
                 v = v->u.o;
             }
-            _copy_value(_get_reg(vs, ins->a), v);
+            copy_value(_get_reg(vs, ins->a), v);
         } break;
 
         case OP_GETGLOBAL: {
@@ -365,10 +365,10 @@ static void _exec_step(V_State *vs) {
             if (data == NULL) {
                 Value r;
                 r.t = VT_NIL;
-                _copy_value(a, &r);
+                copy_value(a, &r);
             } else {
                 const Value *r = CAST(const Value*, data);
-                _copy_value(a, r);
+                copy_value(a, r);
             }
         } break;
 
@@ -382,9 +382,9 @@ static void _exec_step(V_State *vs) {
             if (v == NULL) {
                 Value nil;
                 nil.t = VT_NIL;
-                _copy_value(a, &nil);
+                copy_value(a, &nil);
             } else {
-                _copy_value(a, v);
+                copy_value(a, v);
             }
         } break;
 
@@ -402,7 +402,7 @@ static void _exec_step(V_State *vs) {
         case OP_SETUPVAL: {
             Value *v = &vs->cl->uv.values[ins->u.bc.b];
             V_CHECKTYPE(v, VT_VALUEP);
-            _copy_value(v->u.o, _get_reg(vs, ins->a));
+            copy_value(v->u.o, _get_reg(vs, ins->a));
         } break;
 
         case OP_SETTABLE: {
@@ -418,18 +418,18 @@ static void _exec_step(V_State *vs) {
             Value v;
             v.t = VT_TABLE;
             v.u.o = ltable_new(ins->u.bc.b);    /* TODO: param `c' not used */
-            _copy_value(_get_reg(vs, ins->a), &v);
+            copy_value(_get_reg(vs, ins->a), &v);
         } break;
 
         case OP_SELF: {
             const Value *b = _get_reg(vs, ins->u.bc.b);
             V_CHECKTYPE(b, VT_TABLE);
 
-            _copy_value(_get_reg(vs, ins->a + 1), b);
+            copy_value(_get_reg(vs, ins->a + 1), b);
 
             const Value *c = RK(vs, fn, ins->u.bc.c);
             const Value *v = ltable_gettable(b->u.o, c->u.s);
-            _copy_value(_get_reg(vs, ins->a), v);
+            copy_value(_get_reg(vs, ins->a), v);
         } break;
 
         case OP_ADD:
@@ -473,12 +473,12 @@ static void _exec_step(V_State *vs) {
             } else {
                 v.u.f = ca;
             }
-            _copy_value(_get_reg(vs, ins->a), &v);
+            copy_value(_get_reg(vs, ins->a), &v);
         } break;
 
         case OP_UNM: {
             Value v;
-            _copy_value(&v, _get_reg(vs, ins->u.bc.b));
+            copy_value(&v, _get_reg(vs, ins->u.bc.b));
             if (v.t == VT_INT) {
                 v.u.n = -v.u.n;
             } else if (v.t == VT_FLOAT) {
@@ -486,7 +486,7 @@ static void _exec_step(V_State *vs) {
             } else {
                 error("value type error: %d", v.t);
             }
-            _copy_value(_get_reg(vs, ins->a), &v);
+            copy_value(_get_reg(vs, ins->a), &v);
         } break;
 
         case OP_NOT: {
@@ -498,7 +498,7 @@ static void _exec_step(V_State *vs) {
                 case VT_NIL: {v.u.n = 1;} break;
                 default: {v.u.n = 0;} break;
             }
-            _copy_value(_get_reg(vs, ins->a), &v);
+            copy_value(_get_reg(vs, ins->a), &v);
         } break;
 
         case OP_LEN: {
@@ -509,7 +509,7 @@ static void _exec_step(V_State *vs) {
             Value v;
             v.t = VT_INT;
             v.u.n = len;
-            _copy_value(_get_reg(vs, ins->a), &v);
+            copy_value(_get_reg(vs, ins->a), &v);
         } break;
 
         case OP_CONCAT: {
@@ -531,7 +531,7 @@ static void _exec_step(V_State *vs) {
             Value vnew;
             vnew.t = VT_STRING;
             vnew.u.s = buff;
-            _copy_value(_get_reg(vs, ins->a), &vnew);
+            copy_value(_get_reg(vs, ins->a), &vnew);
             FREE(buff);
         } break;
 
@@ -569,7 +569,7 @@ static void _exec_step(V_State *vs) {
             /* TODO: as OP_TEST, confusing `<=>' */
             int b = (int)_get_value_float(_get_reg(vs, ins->u.bc.b));
             if (b == ins->u.bc.c) {
-                _copy_value(_get_reg(vs, ins->a), _get_reg(vs, ins->u.bc.b));
+                copy_value(_get_reg(vs, ins->a), _get_reg(vs, ins->u.bc.b));
             } else {
                 ++vs->curci->ip;
             }
@@ -616,9 +616,9 @@ static void _exec_step(V_State *vs) {
             for (int i = 0; i < fn->param; ++i) {
                 int idx = ins->a + 1 + i;
                 if (idx >= vs->stk.top) {
-                    _copy_value(_get_reg(vs, i), NULL);
+                    copy_value(_get_reg(vs, i), NULL);
                 } else {
-                    _copy_value(_get_reg(vs, i), _get_reg(vs, idx));
+                    copy_value(_get_reg(vs, i), _get_reg(vs, idx));
                 }
             }
 
@@ -643,9 +643,9 @@ static void _exec_step(V_State *vs) {
             for (int i = retb; i <= rete; ++i) {
                 int idx = ins->a + i - retb;
                 if (idx > ins->a + ins->u.bc.b - 2) { /* TODO: deal with b == 0 */
-                    _copy_value(_get_stack(vs, caller->base + 1 + i), NULL);
+                    copy_value(_get_stack(vs, caller->base + 1 + i), NULL);
                 } else {
-                    _copy_value(_get_stack(vs, caller->base + 1 + i), _get_reg(vs, idx));
+                    copy_value(_get_stack(vs, caller->base + 1 + i), _get_reg(vs, idx));
                 }
             }
 
@@ -658,12 +658,12 @@ static void _exec_step(V_State *vs) {
             Value v;
             v.t = VT_FLOAT;
             v.u.f = af + a2f;
-            _copy_value(_get_reg(vs, ins->a), &v);
+            copy_value(_get_reg(vs, ins->a), &v);
 
             float a1f = _get_value_float(_get_reg(vs, ins->a + 1));
             if (v.u.f <= a1f) {
                 vs->curci->ip += ins->u.bx;
-                _copy_value(_get_reg(vs, ins->a + 3), &v);
+                copy_value(_get_reg(vs, ins->a + 3), &v);
             }
         } break;
 
@@ -673,7 +673,7 @@ static void _exec_step(V_State *vs) {
             Value v;
             v.t = VT_FLOAT;
             v.u.f = af - a2f;
-            _copy_value(_get_reg(vs, ins->a), &v);
+            copy_value(_get_reg(vs, ins->a), &v);
             vs->curci->ip += ins->u.bx;
         } break;
 
@@ -713,12 +713,12 @@ static void _exec_step(V_State *vs) {
             v.t = VT_CLOSURE;
             v.u.o = c;
 
-            _copy_value(_get_reg(vs, ins->a), &v);
+            copy_value(_get_reg(vs, ins->a), &v);
         } break;
 
         case OP_VARARG: {
             for (int i = ins->a + ins->u.bc.b - 1; i>= ins->a; --i) {
-                _copy_value(_get_reg(vs, i), _get_reg(vs, i - ins->a));
+                copy_value(_get_reg(vs, i), _get_reg(vs, i - ins->a));
             }
         } break;
 
@@ -749,7 +749,7 @@ static V_Func* _get_curfunc(const V_State *vs) {
 }
 
 static void _push(V_State *vs, const Value *v) {
-    _copy_value(&vs->stk.values[vs->stk.top], v);
+    copy_value(&vs->stk.values[vs->stk.top], v);
     ++vs->stk.top;
 }
 

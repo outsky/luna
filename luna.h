@@ -53,6 +53,6 @@ typedef struct {
     } u;
 } Value;
 
-void _copy_value(Value *dest, const Value *src);
+void copy_value(Value *dest, const Value *src);
 
 #endif

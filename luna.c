@@ -59,7 +59,7 @@ char* load_file(const char *filename) {
     return fdata;
 }
 
-void _copy_value(Value *dest, const Value *src) {
+void copy_value(Value *dest, const Value *src) {
     if (dest->t == VT_STRING) {
         FREE(dest->u.s);
     }
