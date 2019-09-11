@@ -36,8 +36,8 @@ typedef struct {
 typedef struct {
     int func;
     int ip;
-    int a;
-    int c;
+    int retb;   /* return to reg begin */
+    int rete;   /*               end */
     int base; /* stack slot of this func */
 } V_CallInfo;
 

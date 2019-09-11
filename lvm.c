@@ -21,7 +21,7 @@ static V_Func* _get_func(const V_State *vs, int idx);
 static Value* _get_reg(const V_State *vs, int idx);
 static void _push(V_State *vs, const Value *v);
 static void _pop(V_State *vs, int n);
-static V_CallInfo* _pushci(V_State *vs, int func, int ip, int a, int c);
+static V_CallInfo* _pushci(V_State *vs, int func, int ip, int retb, int rete);
 static void _popci(V_State *vs);
 
 V_State* V_newstate(int stacksize) {
@@ -571,7 +571,7 @@ static void _exec_step(V_State *vs) {
             vs->cl = cl;
 
             /* push callee */
-            V_CallInfo *callee = _pushci(vs, cl->fnidx, -1, ins->a, ins->u.bc.c);
+            V_CallInfo *callee = _pushci(vs, cl->fnidx, -1, ins->a, ins->a + ins->u.bc.c - 2);
 
             /* push params */
             const V_Func *fn = _get_func(vs, cl->fnidx);
@@ -626,11 +626,11 @@ static void _exec_step(V_State *vs) {
             }
 
             V_CallInfo *caller = vs->cis.values[vs->cis.count - 2];
-            int a = vs->curci->a;
-            int c = vs->curci->c;
+            int retb = vs->curci->retb;
+            int rete = vs->curci->rete;
 
-            for (int i = a; i <= a + c - 2; ++i) {
-                int idx = ins->a + i - a;
+            for (int i = retb; i <= rete; ++i) {
+                int idx = ins->a + i - retb;
                 if (idx > ins->a + ins->u.bc.b - 2) { /* TODO: deal with b == 0 */
                     _copy_value(_get_stack(vs, caller->base + 1 + i), NULL);
                 } else {
@@ -741,13 +741,13 @@ static void _pop(V_State *vs, int n) {
     vs->stk.top -= n;
 }
 
-static V_CallInfo* _newci(int func, int ip, int base, int a, int c) {
+static V_CallInfo* _newci(int func, int ip, int base, int retb, int rete) {
     V_CallInfo *ci = NEW(V_CallInfo);
     ci->func = func;
     ci->ip = ip;
     ci->base = base;
-    ci->a = a;
-    ci->c = c;
+    ci->retb = retb;
+    ci->rete = rete;
     return ci;
 }
 
@@ -757,8 +757,8 @@ static void _popci(V_State *vs) {
     vs->curci = vs->cis.values[--vs->cis.count - 1];
 }
 
-static V_CallInfo* _pushci(V_State *vs, int func, int ip, int a, int c) {
-    V_CallInfo *ci = _newci(func, ip, vs->stk.top, a, c);
+static V_CallInfo* _pushci(V_State *vs, int func, int ip, int retb, int rete) {
+    V_CallInfo *ci = _newci(func, ip, vs->stk.top, retb, rete);
     vs->cis.values[vs->cis.count++] = ci;
 
     Value vci;
